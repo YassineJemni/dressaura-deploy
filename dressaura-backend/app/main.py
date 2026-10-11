@@ -9,17 +9,18 @@ import os
 app = FastAPI(title="Dressaura API")
 
 # CORS
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
         "http://localhost:5173",
-        "https://dressaura-frontend.vercel.app",
+        "https://dressaura-deploy.vercel.app",
     ],
-    allow_origin_regex=r"https://dressaura-frontend-[a-zA-Z0-9-]+-hiam-hasheems-projects\.vercel\.app",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
 
 # Uploads folder
 os.makedirs("app/uploads/dresses", exist_ok=True)
