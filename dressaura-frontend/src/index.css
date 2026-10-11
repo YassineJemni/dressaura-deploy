@@ -82,3 +82,25 @@ a.btn.secondary {
   border: 1px solid #111 !important;
   color: #111 !important;
 }
+
+a.btn.primary,
+a.btn.secondary {
+  display: inline-flex !important;
+  text-decoration: none !important;
+  font-family: "Inter", sans-serif !important;
+  padding: 14px 34px !important;
+  border-radius: 999px !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+a.btn.primary {
+  background-color: #c8a96a !important;
+  color: #ffffff !important;
+}
+
+a.btn.secondary {
+  background-color: transparent !important;
+  color: #111111 !important;
+  border: 1px solid #111111 !important;
+}
