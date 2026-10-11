@@ -1,7 +1,15 @@
-from datetime import datetime
-import asyncio
 
-from fastapi import APIRouter, Depends, HTTPException, WebSocket, WebSocketDisconnect
+import asyncio
+import logging
+from datetime import datetime
+
+from fastapi import (
+    APIRouter,
+    Depends,
+    HTTPException,
+    WebSocket,
+    WebSocketDisconnect,
+)
 from sqlalchemy import desc, or_
 from sqlalchemy.orm import Session
 
@@ -11,6 +19,8 @@ from .chat_models import Conversation, Message, Offer
 from .chat_ws import manager
 from .database import get_db
 from .models import Dress, User
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/chat", tags=["chat"])
 
@@ -25,10 +35,16 @@ def _conversation_for_user(
         .filter(Conversation.id == conversation_id)
         .first()
     )
+
     if not conversation:
         raise HTTPException(status_code=404, detail="Conversation not found")
+
     if user_id not in (conversation.user1_id, conversation.user2_id):
-        raise HTTPException(status_code=403, detail="Not a participant in this conversation")
+        raise HTTPException(
+            status_code=403,
+            detail="Not a participant in this conversation",
+        )
+
     return conversation
 
 
@@ -44,25 +60,33 @@ def create_or_get_conversation(
         raise HTTPException(status_code=403, detail="Invalid conversation participants")
 
     other_user_id = user2_id if current_user.id == user1_id else user1_id
+
     if not db.query(User.id).filter(User.id == other_user_id).first():
         raise HTTPException(status_code=404, detail="User not found")
 
     if product_id is not None:
         dress = db.query(Dress).filter(Dress.id == product_id).first()
+
         if not dress or dress.user_id != other_user_id:
-            raise HTTPException(status_code=400, detail="Dress does not belong to the other participant")
+            raise HTTPException(
+                status_code=400,
+                detail="Dress does not belong to the other participant",
+            )
 
     conversation = (
         db.query(Conversation)
         .filter(
             or_(
-                (Conversation.user1_id == user1_id) & (Conversation.user2_id == user2_id),
-                (Conversation.user1_id == user2_id) & (Conversation.user2_id == user1_id),
+                (Conversation.user1_id == user1_id)
+                & (Conversation.user2_id == user2_id),
+                (Conversation.user1_id == user2_id)
+                & (Conversation.user2_id == user1_id),
             ),
             Conversation.product_id == product_id,
         )
         .first()
     )
+
     if conversation:
         return conversation
 
@@ -71,9 +95,11 @@ def create_or_get_conversation(
         user2_id=user2_id,
         product_id=product_id,
     )
+
     db.add(conversation)
     db.commit()
     db.refresh(conversation)
+
     return conversation
 
 
@@ -84,13 +110,22 @@ def get_user_conversations(
     current_user: User = Depends(get_current_user),
 ):
     if current_user.id != user_id:
-        raise HTTPException(status_code=403, detail="Cannot view another user's conversations")
+        raise HTTPException(
+            status_code=403,
+            detail="Cannot view another user's conversations",
+        )
 
     conversations = (
         db.query(Conversation)
-        .filter(or_(Conversation.user1_id == user_id, Conversation.user2_id == user_id))
+        .filter(
+            or_(
+                Conversation.user1_id == user_id,
+                Conversation.user2_id == user_id,
+            )
+        )
         .all()
     )
+
     result = []
 
     for conversation in conversations:
@@ -100,22 +135,30 @@ def get_user_conversations(
             .order_by(desc(Message.created_at))
             .first()
         )
+
         last_offer = (
             db.query(Offer)
             .filter(Offer.conversation_id == conversation.id)
             .order_by(desc(Offer.created_at))
             .first()
         )
+
         other_user_id = (
             conversation.user2_id
             if conversation.user1_id == user_id
             else conversation.user1_id
         )
+
         other_user = db.query(User).filter(User.id == other_user_id).first()
-        dress = db.query(Dress).filter(Dress.id == conversation.product_id).first()
+        dress = (
+            db.query(Dress)
+            .filter(Dress.id == conversation.product_id)
+            .first()
+        )
 
         last_text = None
         last_time = None
+
         if last_message and last_offer:
             if last_offer.created_at > last_message.created_at:
                 last_text = f"Offer made: €{float(last_offer.amount)}"
@@ -134,7 +177,9 @@ def get_user_conversations(
             {
                 "conversation_id": conversation.id,
                 "other_user_id": other_user_id,
-                "other_user_name": other_user.name if other_user else f"User {other_user_id}",
+                "other_user_name": (
+                    other_user.name if other_user else f"User {other_user_id}"
+                ),
                 "last_message": last_text,
                 "last_message_time": last_time,
                 "product": (
@@ -157,6 +202,7 @@ def get_user_conversations(
         key=lambda item: item["last_message_time"] or datetime.min,
         reverse=True,
     )
+
     return result
 
 
@@ -167,12 +213,14 @@ def get_messages(
     current_user: User = Depends(get_current_user),
 ):
     _conversation_for_user(conversation_id, current_user.id, db)
+
     messages = (
         db.query(Message)
         .filter(Message.conversation_id == conversation_id)
         .order_by(Message.created_at.asc())
         .all()
     )
+
     return [
         {
             "id": message.id,
@@ -190,34 +238,67 @@ async def websocket_chat(
     user_id: int,
     db: Session = Depends(get_db),
 ):
+    logger.info("Chat WebSocket connection requested for user_id=%s", user_id)
+
     await websocket.accept()
+
     try:
         try:
-            authentication = await asyncio.wait_for(websocket.receive_json(), timeout=10)
-        except TimeoutError:
+            authentication = await asyncio.wait_for(
+                websocket.receive_json(),
+                timeout=10,
+            )
+        except asyncio.TimeoutError:
+            logger.warning(
+                "Chat WebSocket authentication timed out for user_id=%s",
+                user_id,
+            )
             await websocket.close(code=1008)
             return
 
-        token = authentication.get("token") if isinstance(authentication, dict) else None
-        current_user = auth.get_user_from_token(token, db) if isinstance(token, str) else None
+        token = (
+            authentication.get("token")
+            if isinstance(authentication, dict)
+            else None
+        )
+
+        current_user = (
+            auth.get_user_from_token(token, db)
+            if isinstance(token, str)
+            else None
+        )
+
         if not current_user or current_user.id != user_id:
+            logger.warning(
+                "Chat WebSocket authentication rejected: "
+                "requested_user_id=%s authenticated=%s",
+                user_id,
+                bool(current_user),
+            )
             await websocket.close(code=1008)
             return
+
+        logger.info("Chat WebSocket authenticated for user_id=%s", user_id)
 
         await manager.connect(user_id, websocket, accept=False)
         await websocket.send_json({"type": "ready"})
 
         while True:
             data = await websocket.receive_json()
+
             if not isinstance(data, dict):
-                await websocket.send_json({"type": "error", "detail": "Invalid message"})
+                await websocket.send_json(
+                    {"type": "error", "detail": "Invalid message"}
+                )
                 continue
 
             try:
                 conversation_id = int(data.get("conversation_id", 0))
                 receiver_id = int(data.get("receiver_id", 0))
             except (TypeError, ValueError):
-                await websocket.send_json({"type": "error", "detail": "Invalid conversation"})
+                await websocket.send_json(
+                    {"type": "error", "detail": "Invalid conversation"}
+                )
                 continue
 
             conversation = (
@@ -225,8 +306,14 @@ async def websocket_chat(
                 .filter(Conversation.id == conversation_id)
                 .first()
             )
-            if not conversation or user_id not in (conversation.user1_id, conversation.user2_id):
-                await websocket.send_json({"type": "error", "detail": "Invalid conversation"})
+
+            if (
+                not conversation
+                or user_id not in (conversation.user1_id, conversation.user2_id)
+            ):
+                await websocket.send_json(
+                    {"type": "error", "detail": "Invalid conversation"}
+                )
                 continue
 
             expected_receiver_id = (
@@ -234,16 +321,25 @@ async def websocket_chat(
                 if conversation.user1_id == user_id
                 else conversation.user1_id
             )
+
             if receiver_id != expected_receiver_id:
-                await websocket.send_json({"type": "error", "detail": "Invalid recipient"})
+                await websocket.send_json(
+                    {"type": "error", "detail": "Invalid recipient"}
+                )
                 continue
 
             message_text = data.get("message")
+
             if not isinstance(message_text, str) or not message_text.strip():
-                await websocket.send_json({"type": "error", "detail": "Message cannot be empty"})
+                await websocket.send_json(
+                    {"type": "error", "detail": "Message cannot be empty"}
+                )
                 continue
+
             if len(message_text) > 5000:
-                await websocket.send_json({"type": "error", "detail": "Message is too long"})
+                await websocket.send_json(
+                    {"type": "error", "detail": "Message is too long"}
+                )
                 continue
 
             message = Message(
@@ -251,6 +347,7 @@ async def websocket_chat(
                 sender_id=user_id,
                 message_text=message_text.strip(),
             )
+
             db.add(message)
             db.commit()
             db.refresh(message)
@@ -262,12 +359,29 @@ async def websocket_chat(
                 "receiver_id": receiver_id,
                 "message": message.message_text,
                 "message_id": message.id,
-                "created_at": message.created_at.isoformat() if message.created_at else None,
+                "created_at": (
+                    message.created_at.isoformat()
+                    if message.created_at
+                    else None
+                ),
             }
+
             await manager.send_message(user_id, event)
             await manager.send_message(receiver_id, event)
+
     except WebSocketDisconnect:
-        pass
+        logger.info("Chat WebSocket disconnected for user_id=%s", user_id)
+
+    except Exception:
+        logger.exception(
+            "Unexpected chat WebSocket failure for user_id=%s",
+            user_id,
+        )
+        try:
+            await websocket.close(code=1011)
+        except Exception:
+            pass
+
     finally:
         manager.disconnect(user_id, websocket)
 
@@ -279,8 +393,13 @@ def get_all_users(
     current_user: User = Depends(get_current_user),
 ):
     if current_user.id != current_user_id:
-        raise HTTPException(status_code=403, detail="Cannot view users as another account")
+        raise HTTPException(
+            status_code=403,
+            detail="Cannot view users as another account",
+        )
+
     users = db.query(User).filter(User.id != current_user_id).all()
+
     return [{"id": user.id, "name": user.name} for user in users]
 
 
@@ -296,6 +415,7 @@ def create_offer(
 ):
     conversation = _conversation_for_user(conversation_id, current_user.id, db)
     dress = db.query(Dress).filter(Dress.id == dress_id).first()
+
     if (
         not dress
         or conversation.product_id != dress_id
@@ -314,9 +434,11 @@ def create_offer(
         amount=amount,
         status="pending",
     )
+
     db.add(offer)
     db.commit()
     db.refresh(offer)
+
     return {
         "id": offer.id,
         "conversation_id": offer.conversation_id,
@@ -336,12 +458,14 @@ def get_conversation_offers(
     current_user: User = Depends(get_current_user),
 ):
     _conversation_for_user(conversation_id, current_user.id, db)
+
     offers = (
         db.query(Offer)
         .filter(Offer.conversation_id == conversation_id)
         .order_by(Offer.created_at.asc())
         .all()
     )
+
     return [
         {
             "id": offer.id,
@@ -364,18 +488,30 @@ def _update_offer(
     current_user: User,
 ):
     offer = db.query(Offer).filter(Offer.id == offer_id).first()
+
     if not offer:
         raise HTTPException(status_code=404, detail="Offer not found")
+
     _conversation_for_user(offer.conversation_id, current_user.id, db)
+
     if current_user.id != offer.seller_id:
-        raise HTTPException(status_code=403, detail="Only the seller can respond to this offer")
+        raise HTTPException(
+            status_code=403,
+            detail="Only the seller can respond to this offer",
+        )
+
     if offer.status != "pending":
         raise HTTPException(status_code=409, detail="Offer is no longer pending")
 
     offer.status = status
     db.commit()
     db.refresh(offer)
-    return {"message": f"Offer {status}", "offer_id": offer.id, "status": offer.status}
+
+    return {
+        "message": f"Offer {status}",
+        "offer_id": offer.id,
+        "status": offer.status,
+    }
 
 
 @router.put("/offers/{offer_id}/accept")
