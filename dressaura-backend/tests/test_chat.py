@@ -16,7 +16,6 @@ from fastapi.testclient import TestClient
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
-from sqlalchemy.pool import StaticPool
 
 from app import auth
 from app import deps
@@ -31,10 +30,13 @@ from app.routers import dresses, orders
 class ChatWebSocketTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
+        # File-based SQLite with a normal pool: every session gets its own connection,
+        # like MySQL. (A single shared in-memory connection breaks when two sockets
+        # authenticate on different threads at the same time.)
+        cls.db_dir = tempfile.mkdtemp()
         cls.engine = create_engine(
-            "sqlite://",
-            connect_args={"check_same_thread": False},
-            poolclass=StaticPool,
+            f"sqlite:///{Path(cls.db_dir) / 'test.db'}",
+            connect_args={"check_same_thread": False, "timeout": 15},
         )
         cls.session_factory = sessionmaker(bind=cls.engine, autoflush=False)
         Base.metadata.create_all(bind=cls.engine)
@@ -57,10 +59,19 @@ class ChatWebSocketTests(unittest.TestCase):
         cls.app.dependency_overrides[auth.get_db] = test_db
         cls.app.dependency_overrides[auth_routes.get_db] = test_db
 
+        # The WebSocket handler opens its own short-lived sessions via SessionLocal
+        cls.session_patch = patch(
+            "app.chat_api.SessionLocal", cls.session_factory
+        )
+        cls.session_patch.start()
+
     @classmethod
     def tearDownClass(cls):
+        cls.session_patch.stop()
         Base.metadata.drop_all(bind=cls.engine)
         cls.engine.dispose()
+        import shutil
+        shutil.rmtree(cls.db_dir, ignore_errors=True)
 
     def setUp(self):
         self.upload_directory = tempfile.TemporaryDirectory()
@@ -162,6 +173,42 @@ class ChatWebSocketTests(unittest.TestCase):
         self.assertEqual(len(response.json()), 2)
         self.assertEqual(response.json()[0]["message"], "Hello from the buyer")
         self.assertEqual(response.json()[1]["message"], "Hello from the seller")
+
+    def test_socket_survives_bad_input_and_answers_ping(self):
+        response = self.client.post(
+            "/chat/conversation",
+            params={"user1_id": self.buyer_id, "user2_id": self.seller_id},
+            headers={"Authorization": f"Bearer {self.buyer_token}"},
+        )
+        conversation_id = response.json()["id"]
+
+        with self.client.websocket_connect(f"/chat/ws/{self.buyer_id}") as socket:
+            socket.send_json({"type": "auth", "token": self.buyer_token})
+            self.assertEqual(socket.receive_json()["type"], "ready")
+
+            socket.send_text("this is not json")
+            self.assertEqual(socket.receive_json()["type"], "error")
+
+            socket.send_json({"type": "ping"})
+            self.assertEqual(socket.receive_json()["type"], "pong")
+
+            socket.send_json(
+                {
+                    "conversation_id": conversation_id,
+                    "receiver_id": self.seller_id,
+                    "message": "still connected",
+                }
+            )
+            event = socket.receive_json()
+            self.assertEqual(event["type"], "message")
+            # Timestamps must carry an explicit UTC offset for browsers
+            self.assertTrue(event["created_at"].endswith("+00:00"))
+
+        response = self.client.get(
+            f"/chat/conversation/{conversation_id}/messages",
+            headers={"Authorization": f"Bearer {self.buyer_token}"},
+        )
+        self.assertTrue(response.json()[0]["created_at"].endswith("+00:00"))
 
     def test_nonparticipant_cannot_read_messages_or_connect_as_another_user(self):
         response = self.client.post(

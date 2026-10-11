@@ -52,12 +52,15 @@ export default function ChatPage() {
   const [notice, setNotice] = useState("");
   const [socketConnected, setSocketConnected] = useState(false);
 
+  const noticeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   const showNotice = (message: string) => {
     setNotice(message);
 
-    setTimeout(() => {
+    if (noticeTimerRef.current) clearTimeout(noticeTimerRef.current);
+    noticeTimerRef.current = setTimeout(() => {
       setNotice("");
-    }, 3000);
+    }, 4000);
   };
 
   const [offers, setOffers] = useState<ChatOffer[]>([]);
@@ -69,7 +72,11 @@ export default function ChatPage() {
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
   const messagesAreaRef = useRef<HTMLDivElement | null>(null);
 
-  const { user, token } = useAuth();
+  const { user, token, logout } = useAuth();
+  const logoutRef = useRef(logout);
+  useEffect(() => {
+    logoutRef.current = logout;
+  }, [logout]);
   const location = useLocation();
   const navigate = useNavigate();
   const CURRENT_USER_ID = user?.id;
@@ -151,6 +158,27 @@ export default function ChatPage() {
     let shouldReconnect = true;
     let retryCount = 0;
     let currentSocket: WebSocket | null = null;
+    let heartbeat: ReturnType<typeof setInterval> | null = null;
+    let pongTimeout: ReturnType<typeof setTimeout> | null = null;
+
+    const stopHeartbeat = () => {
+      if (heartbeat) clearInterval(heartbeat);
+      if (pongTimeout) clearTimeout(pongTimeout);
+      heartbeat = null;
+      pongTimeout = null;
+    };
+
+    // Keeps proxies from dropping an idle socket and detects dead connections:
+    // if no pong arrives within 10s the socket is closed and re-opened.
+    const startHeartbeat = (ws: WebSocket) => {
+      stopHeartbeat();
+      heartbeat = setInterval(() => {
+        if (ws.readyState !== WebSocket.OPEN) return;
+        ws.send(JSON.stringify({ type: "ping" }));
+        if (pongTimeout) clearTimeout(pongTimeout);
+        pongTimeout = setTimeout(() => ws.close(), 10000);
+      }, 25000);
+    };
 
     const connect = () => {
       if (!shouldReconnect) return;
@@ -160,15 +188,24 @@ export default function ChatPage() {
       socketRef.current = ws;
 
       ws.onopen = () => {
+        if (currentSocket !== ws) return;
         ws.send(JSON.stringify({ type: "auth", token }));
       };
 
       ws.onmessage = (event) => {
+        // Ignore events from a socket that has been replaced or torn down
+        if (currentSocket !== ws) return;
         try {
           const data = JSON.parse(event.data);
+          if (data.type === "pong") {
+            if (pongTimeout) clearTimeout(pongTimeout);
+            pongTimeout = null;
+            return;
+          }
           if (data.type === "ready") {
             retryCount = 0;
             setSocketConnected(true);
+            startHeartbeat(ws);
             const activeConversationId =
               activeConversationRef.current?.conversation_id;
             if (activeConversationId) {
@@ -264,14 +301,21 @@ export default function ChatPage() {
       };
 
       ws.onerror = () => {
-        showNotice("Chat connection error. Reconnecting…");
+        // onclose always follows and handles the retry; just avoid noise for stale sockets
+        if (currentSocket !== ws) return;
+        console.warn("Chat WebSocket error");
       };
 
       ws.onclose = (event) => {
+        if (currentSocket !== ws) return;
+        stopHeartbeat();
         setSocketConnected(false);
         if (socketRef.current === ws) socketRef.current = null;
         if (!shouldReconnect || event.code === 1008 || event.code === 1002) {
-          if (event.code === 1008) showNotice("Your chat session expired. Please log in again.");
+          if (event.code === 1008) {
+            showNotice("Your session expired. Please log in again.");
+            logoutRef.current();
+          }
           return;
         }
         const delay = Math.min(1000 * 2 ** retryCount, 30000);
@@ -283,8 +327,13 @@ export default function ChatPage() {
     connect();
     return () => {
       shouldReconnect = false;
+      stopHeartbeat();
       if (reconnectTimerRef.current) clearTimeout(reconnectTimerRef.current);
-      if (currentSocket && currentSocket.readyState < WebSocket.CLOSING) currentSocket.close();
+      if (currentSocket) {
+        const closing = currentSocket;
+        currentSocket = null; // makes every handler above ignore this socket
+        if (closing.readyState < WebSocket.CLOSING) closing.close();
+      }
       socketRef.current = null;
       setSocketConnected(false);
     };
@@ -397,7 +446,7 @@ export default function ChatPage() {
   const sendMessage = () => {
     const socket = socketRef.current;
 
-    if (!newMessage.trim() || !activeConversation) return;
+    if (!newMessage.trim() || !activeConversation || isUnavailable) return;
     if (!socket || socket.readyState !== WebSocket.OPEN) {
       showNotice("Chat is reconnecting. Please try again in a moment.");
       return;
@@ -479,7 +528,7 @@ export default function ChatPage() {
   };
 
   const handleKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === "Enter") sendMessage();
+    if (e.key === "Enter" && !e.nativeEvent.isComposing) sendMessage();
   };
 
   const getInitial = (name?: string) => (name || "?").charAt(0).toUpperCase();

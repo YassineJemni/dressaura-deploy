@@ -1,6 +1,12 @@
+from datetime import datetime, timezone
+
 from sqlalchemy import Column, Integer, ForeignKey, Text, DateTime, DECIMAL, String
 from sqlalchemy.sql import func
 from .database import Base
+
+
+def _utcnow():
+    return datetime.now(timezone.utc)
 
 
 class Conversation(Base):
@@ -10,7 +16,11 @@ class Conversation(Base):
     user1_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     user2_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     product_id = Column(Integer, ForeignKey("dresses.id"), nullable=True)
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    created_at = Column(
+        DateTime(timezone=True),
+        default=_utcnow,
+        server_default=func.now(),
+    )
 
 
 class Message(Base):
@@ -20,7 +30,11 @@ class Message(Base):
     conversation_id = Column(Integer, ForeignKey("conversations.id"))
     sender_id = Column(Integer, ForeignKey("users.id"))
     message_text = Column(Text)
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    created_at = Column(
+        DateTime(timezone=True),
+        default=_utcnow,
+        server_default=func.now(),
+    )
 
 
 class Offer(Base):
@@ -35,4 +49,8 @@ class Offer(Base):
     amount = Column(DECIMAL(10, 2), nullable=False)
     status = Column(String(50), default="pending")
 
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    created_at = Column(
+        DateTime(timezone=True),
+        default=_utcnow,
+        server_default=func.now(),
+    )

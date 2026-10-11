@@ -1,7 +1,8 @@
 
 import asyncio
+import json
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 
 from fastapi import (
     APIRouter,
@@ -12,17 +13,29 @@ from fastapi import (
 )
 from sqlalchemy import desc, or_
 from sqlalchemy.orm import Session
+from starlette.concurrency import run_in_threadpool
 
 from . import auth
 from .auth import get_current_user
 from .chat_models import Conversation, Message, Offer
 from .chat_ws import manager
-from .database import get_db
+from .database import SessionLocal, get_db
 from .models import Dress, User
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/chat", tags=["chat"])
+
+MAX_MESSAGE_LENGTH = 5000
+
+
+def _utc_iso(value: datetime | None) -> str | None:
+    """Serialize DB datetimes as explicit UTC so browsers don't treat them as local time."""
+    if value is None:
+        return None
+    if value.tzinfo is None:
+        value = value.replace(tzinfo=timezone.utc)
+    return value.astimezone(timezone.utc).isoformat()
 
 
 def _conversation_for_user(
@@ -132,14 +145,14 @@ def get_user_conversations(
         last_message = (
             db.query(Message)
             .filter(Message.conversation_id == conversation.id)
-            .order_by(desc(Message.created_at))
+            .order_by(desc(Message.created_at), desc(Message.id))
             .first()
         )
 
         last_offer = (
             db.query(Offer)
             .filter(Offer.conversation_id == conversation.id)
-            .order_by(desc(Offer.created_at))
+            .order_by(desc(Offer.created_at), desc(Offer.id))
             .first()
         )
 
@@ -181,7 +194,7 @@ def get_user_conversations(
                     other_user.name if other_user else f"User {other_user_id}"
                 ),
                 "last_message": last_text,
-                "last_message_time": last_time,
+                "last_message_time": _utc_iso(last_time),
                 "product": (
                     {
                         "id": dress.id,
@@ -199,7 +212,7 @@ def get_user_conversations(
         )
 
     result.sort(
-        key=lambda item: item["last_message_time"] or datetime.min,
+        key=lambda item: item["last_message_time"] or "",
         reverse=True,
     )
 
@@ -217,7 +230,7 @@ def get_messages(
     messages = (
         db.query(Message)
         .filter(Message.conversation_id == conversation_id)
-        .order_by(Message.created_at.asc())
+        .order_by(Message.created_at.asc(), Message.id.asc())
         .all()
     )
 
@@ -226,164 +239,182 @@ def get_messages(
             "id": message.id,
             "sender_id": message.sender_id,
             "message": message.message_text,
-            "created_at": message.created_at,
+            "created_at": _utc_iso(message.created_at),
         }
         for message in messages
     ]
 
 
+def _authenticate_token(token: str) -> int | None:
+    """Blocking helper: return the user id for a valid token (own short-lived session)."""
+    with SessionLocal() as db:
+        user = auth.get_user_from_token(token, db)
+        return user.id if user else None
+
+
+def _save_message(
+    sender_id: int,
+    conversation_id: int,
+    receiver_id: int,
+    text: str,
+) -> tuple[dict | None, str | None]:
+    """Blocking helper: validate + persist one message. Returns (event, error)."""
+    with SessionLocal() as db:
+        conversation = (
+            db.query(Conversation)
+            .filter(Conversation.id == conversation_id)
+            .first()
+        )
+
+        if not conversation or sender_id not in (
+            conversation.user1_id,
+            conversation.user2_id,
+        ):
+            return None, "Invalid conversation"
+
+        expected_receiver_id = (
+            conversation.user2_id
+            if conversation.user1_id == sender_id
+            else conversation.user1_id
+        )
+
+        if receiver_id != expected_receiver_id:
+            return None, "Invalid recipient"
+
+        message = Message(
+            conversation_id=conversation.id,
+            sender_id=sender_id,
+            message_text=text,
+        )
+
+        try:
+            db.add(message)
+            db.commit()
+            db.refresh(message)
+        except Exception:
+            db.rollback()
+            logger.exception("Could not save chat message")
+            return None, "Message could not be saved. Please try again."
+
+        return (
+            {
+                "type": "message",
+                "conversation_id": conversation.id,
+                "sender_id": sender_id,
+                "receiver_id": receiver_id,
+                "message": message.message_text,
+                "message_id": message.id,
+                "created_at": _utc_iso(message.created_at),
+            },
+            None,
+        )
+
+
+async def _receive_json(websocket: WebSocket):
+    """Receive a text frame and parse it; return None for malformed JSON instead of raising."""
+    raw = await websocket.receive_text()
+    try:
+        return json.loads(raw)
+    except ValueError:
+        return None
+
+
 @router.websocket("/ws/{user_id}")
-async def websocket_chat(
-    websocket: WebSocket,
-    user_id: int,
-    db: Session = Depends(get_db),
-):
+async def websocket_chat(websocket: WebSocket, user_id: int):
+    # NOTE: no Depends(get_db) here. A dependency session would be held open for the
+    # whole connection (exhausting the pool and dying on idle timeouts) and its blocking
+    # queries would stall the event loop. Each operation opens its own short session
+    # in a worker thread instead.
     logger.info("Chat WebSocket connection requested for user_id=%s", user_id)
 
     await websocket.accept()
+    registered = False
 
     try:
         try:
-            authentication = await asyncio.wait_for(
-                websocket.receive_json(),
-                timeout=10,
-            )
+            authentication = await asyncio.wait_for(_receive_json(websocket), timeout=10)
         except asyncio.TimeoutError:
-            logger.warning(
-                "Chat WebSocket authentication timed out for user_id=%s",
-                user_id,
-            )
+            logger.warning("Chat WebSocket auth timed out for user_id=%s", user_id)
             await websocket.close(code=1008)
             return
 
-        token = (
-            authentication.get("token")
-            if isinstance(authentication, dict)
-            else None
-        )
-
-        current_user = (
-            auth.get_user_from_token(token, db)
+        token = authentication.get("token") if isinstance(authentication, dict) else None
+        authenticated_id = (
+            await run_in_threadpool(_authenticate_token, token)
             if isinstance(token, str)
             else None
         )
 
-        if not current_user or current_user.id != user_id:
+        if authenticated_id is None or authenticated_id != user_id:
             logger.warning(
-                "Chat WebSocket authentication rejected: "
-                "requested_user_id=%s authenticated=%s",
+                "Chat WebSocket auth rejected: requested_user_id=%s authenticated=%s",
                 user_id,
-                bool(current_user),
+                authenticated_id is not None,
             )
             await websocket.close(code=1008)
             return
 
-        logger.info("Chat WebSocket authenticated for user_id=%s", user_id)
-
         await manager.connect(user_id, websocket, accept=False)
+        registered = True
         await websocket.send_json({"type": "ready"})
 
         while True:
-            data = await websocket.receive_json()
+            data = await _receive_json(websocket)
 
             if not isinstance(data, dict):
-                await websocket.send_json(
-                    {"type": "error", "detail": "Invalid message"}
-                )
+                await websocket.send_json({"type": "error", "detail": "Invalid message"})
+                continue
+
+            if data.get("type") == "ping":
+                await websocket.send_json({"type": "pong"})
                 continue
 
             try:
                 conversation_id = int(data.get("conversation_id", 0))
                 receiver_id = int(data.get("receiver_id", 0))
             except (TypeError, ValueError):
-                await websocket.send_json(
-                    {"type": "error", "detail": "Invalid conversation"}
-                )
-                continue
-
-            conversation = (
-                db.query(Conversation)
-                .filter(Conversation.id == conversation_id)
-                .first()
-            )
-
-            if (
-                not conversation
-                or user_id not in (conversation.user1_id, conversation.user2_id)
-            ):
-                await websocket.send_json(
-                    {"type": "error", "detail": "Invalid conversation"}
-                )
-                continue
-
-            expected_receiver_id = (
-                conversation.user2_id
-                if conversation.user1_id == user_id
-                else conversation.user1_id
-            )
-
-            if receiver_id != expected_receiver_id:
-                await websocket.send_json(
-                    {"type": "error", "detail": "Invalid recipient"}
-                )
+                await websocket.send_json({"type": "error", "detail": "Invalid conversation"})
                 continue
 
             message_text = data.get("message")
 
             if not isinstance(message_text, str) or not message_text.strip():
-                await websocket.send_json(
-                    {"type": "error", "detail": "Message cannot be empty"}
-                )
+                await websocket.send_json({"type": "error", "detail": "Message cannot be empty"})
                 continue
 
-            if len(message_text) > 5000:
-                await websocket.send_json(
-                    {"type": "error", "detail": "Message is too long"}
-                )
+            if len(message_text) > MAX_MESSAGE_LENGTH:
+                await websocket.send_json({"type": "error", "detail": "Message is too long"})
                 continue
 
-            message = Message(
-                conversation_id=conversation.id,
-                sender_id=user_id,
-                message_text=message_text.strip(),
+            event, error = await run_in_threadpool(
+                _save_message,
+                user_id,
+                conversation_id,
+                receiver_id,
+                message_text.strip(),
             )
 
-            db.add(message)
-            db.commit()
-            db.refresh(message)
-
-            event = {
-                "type": "message",
-                "conversation_id": conversation.id,
-                "sender_id": user_id,
-                "receiver_id": receiver_id,
-                "message": message.message_text,
-                "message_id": message.id,
-                "created_at": (
-                    message.created_at.isoformat()
-                    if message.created_at
-                    else None
-                ),
-            }
+            if error or event is None:
+                await websocket.send_json({"type": "error", "detail": error or "Invalid message"})
+                continue
 
             await manager.send_message(user_id, event)
-            await manager.send_message(receiver_id, event)
+            if receiver_id != user_id:
+                await manager.send_message(receiver_id, event)
 
     except WebSocketDisconnect:
         logger.info("Chat WebSocket disconnected for user_id=%s", user_id)
 
     except Exception:
-        logger.exception(
-            "Unexpected chat WebSocket failure for user_id=%s",
-            user_id,
-        )
+        logger.exception("Unexpected chat WebSocket failure for user_id=%s", user_id)
         try:
             await websocket.close(code=1011)
         except Exception:
             pass
 
     finally:
-        manager.disconnect(user_id, websocket)
+        if registered:
+            manager.disconnect(user_id, websocket)
 
 
 @router.get("/users/{current_user_id}")
@@ -447,7 +478,7 @@ def create_offer(
         "seller_id": offer.seller_id,
         "amount": float(offer.amount),
         "status": offer.status,
-        "created_at": offer.created_at,
+        "created_at": _utc_iso(offer.created_at),
     }
 
 
@@ -462,7 +493,7 @@ def get_conversation_offers(
     offers = (
         db.query(Offer)
         .filter(Offer.conversation_id == conversation_id)
-        .order_by(Offer.created_at.asc())
+        .order_by(Offer.created_at.asc(), Offer.id.asc())
         .all()
     )
 
@@ -475,7 +506,7 @@ def get_conversation_offers(
             "seller_id": offer.seller_id,
             "amount": float(offer.amount),
             "status": offer.status,
-            "created_at": offer.created_at,
+            "created_at": _utc_iso(offer.created_at),
         }
         for offer in offers
     ]

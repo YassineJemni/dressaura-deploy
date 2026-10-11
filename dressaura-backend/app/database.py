@@ -20,6 +20,8 @@ DATABASE_URL = (
 engine = create_engine(
     DATABASE_URL,
     connect_args={"ssl": {"check_hostname": True}},
+    pool_pre_ping=True,   # drop dead connections instead of failing the request
+    pool_recycle=280,     # recycle before hosted MySQL closes idle connections
     echo=False,
 )
 
