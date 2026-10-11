@@ -1,4 +1,4 @@
-const API_URL = "https://dressaura-backend.vercel.app";
+const API_URL = "https://dressaura-deploy.onrender.com";
 
 export async function fetchDresses() {
   const res = await fetch(`${API_URL}/dresses/`);

@@ -4,7 +4,7 @@ import { Link, useParams } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { useAuth } from "../context/AuthContext";
 
-const API_URL = "https://dressaura-backend.vercel.app";
+const API_URL = "https://dressaura-deploy.onrender.com";
 
 function OrdersPage() {
   const { type, status } = useParams();

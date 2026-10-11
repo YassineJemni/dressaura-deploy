@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useAuth } from "../context/AuthContext";
 import "./ProductDetails.css";
 
-const API_URL = "https://dressaura-backend.vercel.app";
+const API_URL = "https://dressaura-deploy.onrender.com";
 
 function ProductDetails() {
   const { id } = useParams();

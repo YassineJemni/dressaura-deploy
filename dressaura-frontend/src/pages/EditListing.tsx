@@ -3,7 +3,7 @@ import "./EditListing.css";
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 
-const API_URL = "https://dressaura-backend.vercel.app";
+const API_URL = "https://dressaura-deploy.onrender.com";
 
 type PhotoItem =
   | {

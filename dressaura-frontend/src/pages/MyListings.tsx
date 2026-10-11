@@ -4,7 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { useEffect, useState } from "react";
 
-const API_URL = "https://dressaura-backend.vercel.app";
+const API_URL = "https://dressaura-deploy.onrender.com";
 
 export default function MyListings() {
   const navigate = useNavigate();

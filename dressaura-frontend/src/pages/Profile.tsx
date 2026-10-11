@@ -32,7 +32,7 @@ export default function Profile() {
 
       try {
         // Fetch listings
-        const dressesRes = await fetch("https://dressaura-backend.vercel.app/dresses/");
+        const dressesRes = await fetch("https://dressaura-deploy.onrender.com/dresses/");
         const dressesData: Dress[] = await dressesRes.json();
 
         const userListings = dressesData.filter(
@@ -40,7 +40,7 @@ export default function Profile() {
         );
 
         // Fetch sold + ordered stats
-        const ordersRes = await fetch(`https://dressaura-backend.vercel.app/orders/stats/${user.id}`);
+        const ordersRes = await fetch(`https://dressaura-deploy.onrender.com/orders/stats/${user.id}`);
         const ordersData = await ordersRes.json();
 
         setStats({

@@ -4,8 +4,8 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import "./ChatPage.css";
 
-const API_URL = "https://dressaura-backend.vercel.app";
-const WS_URL = "wss://dressaura-backend.vercel.app";
+const API_URL = "https://dressaura-deploy.onrender.com";
+const WS_URL = "wss://dressaura-deploy.onrender.com";
 
 export default function ChatPage() {
   const [conversations, setConversations] = useState([]);

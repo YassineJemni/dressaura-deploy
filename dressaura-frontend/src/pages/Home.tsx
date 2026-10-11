@@ -8,7 +8,7 @@ function Home() {
   const location = useLocation();
 
   useEffect(() => {
-    fetch("https://dressaura-backend.vercel.app/dresses/")
+    fetch("https://dressaura-deploy.onrender.com/dresses/")
       .then((res) => res.json())
       .then((data) => setDresses(data))
       .catch((err) => console.error("Failed to load dresses:", err));
