@@ -1,0 +1,426 @@
+.edit-listing-page {
+  min-height: calc(100vh - 72px);
+
+  background: #f4ede4;
+
+  padding: 80px 20px;
+
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.edit-title {
+  font-size: 2.4rem;
+
+  color: #111;
+
+  margin-bottom: 8px;
+}
+
+.edit-subtitle {
+  font-size: 1rem;
+
+  color: #444;
+
+  margin-bottom: 40px;
+
+  text-align: center;
+}
+
+.edit-form {
+  background: #ffffff;
+
+  width: 100%;
+  max-width: 650px;
+
+  padding: 40px;
+
+  border-radius: 16px;
+
+  display: flex;
+  flex-direction: column;
+
+  gap: 22px;
+
+  box-sizing: border-box;
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+
+  gap: 6px;
+}
+
+.form-group label {
+  font-size: 0.9rem;
+
+  color: #111;
+}
+
+.form-group input,
+.form-group select,
+.form-group textarea {
+  padding: 10px 12px;
+
+  border-radius: 8px;
+
+  border: 1px solid #ccc;
+
+  font-size: 0.9rem;
+
+  resize: none;
+
+  background: #fff;
+
+  box-sizing: border-box;
+
+  width: 100%;
+}
+
+
+.photo-header {
+  display: flex;
+
+  justify-content: space-between;
+
+  align-items: center;
+
+  margin-bottom: 2px;
+}
+
+.photo-header label {
+  font-size: 0.9rem;
+
+  color: #111;
+}
+
+.photo-count {
+  font-size: 0.8rem;
+
+  color: #777;
+}
+
+.photo-help {
+  font-size: 0.8rem;
+
+  color: #777;
+
+  margin: 0 0 8px 0;
+
+  line-height: 1.4;
+}
+
+
+
+.photo-grid {
+  display: grid;
+
+  grid-template-columns:
+    repeat(4, 1fr);
+
+  gap: 10px;
+
+  width: 100%;
+}
+
+
+.photo-item {
+  position: relative;
+
+  aspect-ratio: 1 / 1;
+
+  border-radius: 10px;
+
+  overflow: hidden;
+
+  background: #f4f4f4;
+
+  cursor: grab;
+
+  border: 1px solid #ddd;
+
+  transition:
+    transform 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+.photo-item:hover {
+  transform: translateY(-2px);
+
+  box-shadow:
+    0 5px 15px
+    rgba(0, 0, 0, 0.12);
+}
+
+.photo-item:active {
+  cursor: grabbing;
+}
+
+.photo-item img {
+  width: 100%;
+
+  height: 100%;
+
+  object-fit: cover;
+
+  display: block;
+}
+
+
+.cover-badge {
+  position: absolute;
+
+  top: 7px;
+
+  left: 7px;
+
+  padding: 4px 7px;
+
+  background: rgba(17, 17, 17, 0.86);
+
+  color: white;
+
+  border-radius: 5px;
+
+  font-size: 9px;
+
+  font-weight: 600;
+}
+
+
+.photo-number {
+  position: absolute;
+
+  bottom: 7px;
+
+  left: 7px;
+
+  width: 22px;
+
+  height: 22px;
+
+  display: flex;
+
+  align-items: center;
+
+  justify-content: center;
+
+  background: rgba(255, 255, 255, 0.92);
+
+  color: #111;
+
+  border-radius: 50%;
+
+  font-size: 10px;
+
+  font-weight: 600;
+}
+
+
+.remove-photo {
+  position: absolute;
+
+  top: 6px;
+
+  right: 6px;
+
+  width: 25px;
+
+  height: 25px;
+
+  border: none;
+
+  border-radius: 50%;
+
+  background: rgba(255, 255, 255, 0.94);
+
+  color: #111;
+
+  font-size: 18px;
+
+  line-height: 1;
+
+  display: flex;
+
+  align-items: center;
+
+  justify-content: center;
+
+  cursor: pointer;
+
+  padding: 0;
+
+  z-index: 2;
+}
+
+.remove-photo:hover {
+  background: #111;
+
+  color: white;
+}
+
+
+
+.drag-hint {
+  position: absolute;
+
+  right: 7px;
+
+  bottom: 7px;
+
+  color: white;
+
+  font-size: 14px;
+
+  text-shadow:
+    0 1px 4px
+    rgba(0, 0, 0, 0.6);
+
+  pointer-events: none;
+}
+
+
+
+
+.add-photo {
+  aspect-ratio: 1 / 1;
+
+  border:
+    1.5px dashed
+    #b9b0a7;
+
+  border-radius: 10px;
+
+  background: #faf8f5;
+
+  display: flex;
+
+  flex-direction: column;
+
+  align-items: center;
+
+  justify-content: center;
+
+  gap: 5px;
+
+  color: #555;
+
+  cursor: pointer;
+
+  transition:
+    background 0.2s ease,
+    border-color 0.2s ease;
+}
+
+.add-photo:hover {
+  background: #f3ede6;
+
+  border-color: #c9a862;
+}
+
+.add-photo-icon {
+  font-size: 26px;
+
+  line-height: 1;
+
+  color: #111;
+}
+
+.add-photo span:not(.add-photo-icon) {
+  font-size: 0.8rem;
+
+  font-weight: 500;
+}
+
+.add-photo small {
+  font-size: 0.65rem;
+
+  color: #888;
+}
+
+
+
+
+.edit-error {
+  color: #c94242;
+
+  font-size: 0.9rem;
+
+  margin: 0;
+
+  line-height: 1.4;
+}
+
+
+
+
+.edit-actions {
+  display: flex;
+
+  gap: 12px;
+
+  margin-top: 10px;
+}
+
+.cancel-btn,
+.save-btn {
+  flex: 1;
+
+  padding: 14px;
+
+  border-radius: 28px;
+
+  border: none;
+
+  font-size: 0.95rem;
+
+  cursor: pointer;
+}
+
+.cancel-btn {
+  background: #e7ddd3;
+
+  color: #111;
+}
+
+.save-btn {
+  background: #c9a862;
+
+  color: white;
+}
+
+.cancel-btn:hover,
+.save-btn:hover {
+  opacity: 0.9;
+}
+
+.save-btn:disabled {
+  opacity: 0.7;
+
+  cursor: not-allowed;
+}
+
+
+
+
+@media (max-width: 600px) {
+
+  .edit-listing-page {
+    padding: 50px 15px;
+  }
+
+  .edit-form {
+    padding: 28px 22px;
+  }
+
+  .photo-grid {
+    grid-template-columns:
+      repeat(3, 1fr);
+  }
+
+  .edit-actions {
+    flex-direction: column;
+  }
+}

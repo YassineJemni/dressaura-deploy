@@ -1,0 +1,93 @@
+.edit-profile-page {
+  min-height: 100vh;
+  background: #f7efe7;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 40px 20px;
+}
+
+.edit-profile-card {
+  width: 100%;
+  max-width: 520px;
+  background: white;
+  border-radius: 24px;
+  padding: 30px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
+}
+
+.edit-profile-card h1 {
+  margin: 0 0 8px;
+  color: #1f1f1f;
+}
+
+.edit-subtitle {
+  color: #777;
+  margin-bottom: 24px;
+}
+
+.edit-profile-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.edit-profile-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-weight: 600;
+  color: #222;
+  font-size: 14px;
+}
+
+.edit-profile-form input {
+  padding: 14px 16px;
+  border: 1px solid #ddd;
+  border-radius: 14px;
+  font-size: 15px;
+  outline: none;
+}
+
+.edit-profile-form input:focus {
+  border-color: #111;
+}
+
+.form-message {
+  margin: 0;
+  font-size: 14px;
+}
+
+.form-message.error {
+  color: #d64545;
+}
+
+.form-message.success {
+  color: #2f8f4e;
+}
+
+.edit-profile-actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 8px;
+}
+
+.edit-profile-actions button {
+  flex: 1;
+  border: none;
+  border-radius: 14px;
+  padding: 14px;
+  cursor: pointer;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.primary-btn {
+  background: #111;
+  color: white;
+}
+
+.secondary-btn {
+  background: #f2f2f2;
+  color: #111;
+}

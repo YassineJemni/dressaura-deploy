@@ -1,0 +1,65 @@
+.navbar {
+  background-color: #111;
+  height: 72px;
+  display: flex;
+  align-items: center;
+}
+
+.navbar-container {
+  width: 100%;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 30px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+/* LOGO */
+.navbar .logo a {
+  color: #ffffff !important;
+  font-size: 0.85rem;
+  letter-spacing: 0.35em;
+  text-decoration: none;
+}
+
+/* CENTER LINKS */
+.navbar .nav-links {
+  display: flex;
+  align-items: center;
+  gap: 32px;
+}
+
+.navbar .nav-links a {
+  color: #ffffff !important;
+  font-size: 0.9rem;
+  font-weight: 500;
+  text-decoration: none;
+  opacity: 0.9;
+}
+
+.navbar .nav-links a:hover {
+  opacity: 1;
+}
+
+/* RIGHT LINKS */
+.navbar .auth-links {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.navbar .auth-links a {
+  color: #ffffff !important;
+  font-size: 0.85rem;
+  font-weight: 500;
+  text-decoration: none;
+}
+
+/* REGISTER BUTTON */
+.navbar .auth-links .register {
+  border: 1px solid #ffffff;
+  padding: 7px 16px;
+  border-radius: 20px;
+  line-height: 1;
+}

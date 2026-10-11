@@ -1,0 +1,83 @@
+.sell-page {
+  min-height: calc(100vh - 72px);
+  background: #f4ede4;
+  padding: 80px 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.sell-title {
+  font-size: 2.4rem;
+  color: #111;
+  margin-bottom: 8px;
+}
+
+.sell-subtitle {
+  font-size: 1rem;
+  color: #444;
+  margin-bottom: 40px;
+  text-align: center;
+}
+
+/* FORM */
+.sell-form {
+  background: #ffffff;
+  width: 100%;
+  max-width: 500px;
+  padding: 40px;
+  border-radius: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.form-group label {
+  font-size: 0.9rem;
+  color: #111;
+}
+
+.form-group input,
+.form-group select,
+.form-group textarea {
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid #ccc;
+  font-size: 0.9rem;
+  resize: none;
+}
+
+/* IMAGE PLACEHOLDER */
+.image-upload {
+  height: 140px;
+  border: 1px dashed #bbb;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #777;
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+
+/* BUTTON */
+.sell-btn {
+  margin-top: 10px;
+  padding: 14px;
+  border-radius: 28px;
+  border: none;
+  background: #c9a862;
+  color: white;
+  font-size: 0.95rem;
+  cursor: pointer;
+}
+
+.sell-btn:hover {
+  opacity: 0.9;
+}

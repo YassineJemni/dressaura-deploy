@@ -1,0 +1,226 @@
+.home {
+  background: #f4ede4;
+}
+
+
+.hero {
+  height: 90vh;
+  background-color: #f4ede4;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.hero-container {
+  text-align: center;
+  padding: 0 20px;
+}
+
+.brand-title {
+  font-size: 5rem;
+  font-weight: 600;
+  letter-spacing: 0.35em;
+  color: #111;
+}
+
+
+.brand-tagline {
+  font-size: 1.15rem;
+  color: #222;
+  margin-bottom: 42px;
+}
+
+.hero-buttons {
+  display: flex;
+  justify-content: center;
+  gap: 18px;
+}
+
+/* FEATURED */
+.featured {
+  padding: 90px 30px;
+  background-color: #ffffff;
+}
+
+.section-title {
+  text-align: center;
+  font-size: 2.2rem;
+  margin-bottom: 55px;
+  color: #111;
+}
+
+.dress-grid {
+  max-width: 1200px;
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 30px;
+}
+
+/* HOW IT WORKS (BLACK SECTION) */
+.how-it-works {
+  background-color: #111;
+  color: white;
+  padding: 110px 30px;
+}
+
+/* navbar overlap fix */
+#how-it-works {
+  scroll-margin-top: 90px;
+}
+
+.section-title.light {
+  color: white;
+}
+
+.how-container {
+  max-width: 1050px;
+  margin: 0 auto;
+  text-align: center;
+}
+
+.steps {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 40px;
+  margin-top: 60px;
+}
+
+.step span {
+  font-size: 2rem;
+  opacity: 0.6;
+}
+
+.step h3 {
+  margin: 14px 0 10px;
+  font-size: 1.2rem;
+}
+
+.step p {
+  font-size: 0.92rem;
+  color: #cfcfcf;
+  line-height: 1.5;
+}
+
+@media (max-width: 900px) {
+  .brand-title {
+    font-size: 3.4rem;
+  }
+  .dress-grid,
+  .steps {
+    grid-template-columns: 1fr;
+  }
+}
+
+.flows {
+  display: flex;
+  gap: 40px;
+  justify-content: center;
+  margin-top: 60px;
+}
+
+.flow-card {
+  background: rgba(255, 255, 255, 0.04);
+  border-radius: 16px;
+  padding: 30px;
+  width: 320px;
+}
+
+.flow-card h3 {
+  margin-bottom: 24px;
+  font-size: 22px;
+}
+
+.flow-step {
+  display: flex;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.flow-step span {
+  font-size: 28px;
+  opacity: 0.4;
+  min-width: 40px;
+}
+
+.flow-step h4 {
+  margin: 0;
+  font-size: 16px;
+}
+
+.flow-step p {
+  margin: 4px 0 0;
+  font-size: 14px;
+  opacity: 0.7;
+}
+
+/* Mobile */
+@media (max-width: 768px) {
+  .flows {
+    flex-direction: column;
+    align-items: center;
+  }
+}
+
+
+
+/* FEATURED UPGRADE ONLY */
+.featured {
+  overflow: hidden;
+}
+
+.featured-header {
+  text-align: center;
+}
+
+.featured-label {
+  margin: 0 0 8px;
+  color: #9a7a45;
+  font-size: 0.82rem;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+}
+
+.featured-marquee {
+  width: 100%;
+  overflow: hidden;
+  padding: 8px 0 22px;
+}
+
+.featured-track {
+  display: flex;
+  gap: 34px;
+  width: max-content;
+  animation: featuredSlide 28s linear infinite;
+}
+
+.featured-marquee:hover .featured-track {
+  animation-play-state: paused;
+}
+
+.featured-card-wrap {
+  width: 360px;
+  flex: 0 0 360px;
+  transition: transform 0.3s ease;
+}
+
+.featured-card-wrap:hover {
+  transform: translateY(-8px);
+}
+
+@keyframes featuredSlide {
+  from {
+    transform: translateX(0);
+  }
+
+  to {
+    transform: translateX(-33.333%);
+  }
+}
+
+@media (max-width: 900px) {
+  .featured-card-wrap {
+    width: 320px;
+    flex: 0 0 320px;
+  }
+}

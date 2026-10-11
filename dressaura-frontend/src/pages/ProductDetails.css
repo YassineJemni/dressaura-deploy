@@ -1,0 +1,359 @@
+.product-details {
+  background-color: #f4ede4;
+  min-height: calc(100vh - 68px);
+  padding: 70px 0;
+}
+
+
+.details-container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 40px;
+
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 70px;
+
+  align-items: center;
+}
+
+
+.images {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+
+/* Main image area */
+
+.main-image-wrapper {
+  position: relative;
+
+  width: 100%;
+  max-width: 560px;
+  height: 560px;
+
+  background-color: #ead9c5;
+  border-radius: 18px;
+
+  overflow: hidden;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  touch-action: pan-y;
+
+  user-select: none;
+}
+
+
+/* Actual product photo */
+
+.main-product-image {
+  width: 100%;
+  height: 100%;
+
+  object-fit: contain;
+
+  display: block;
+
+  border-radius: 18px;
+}
+
+
+/* Empty image */
+
+.main-image {
+  width: 100%;
+  height: 100%;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  color: #777;
+  font-size: 1rem;
+}
+
+
+
+.gallery-arrow {
+  position: absolute;
+
+  top: 50%;
+  transform: translateY(-50%);
+
+  width: 44px;
+  height: 44px;
+
+  border: none;
+  border-radius: 50%;
+
+  background: rgba(255, 255, 255, 0.9);
+
+  color: #111;
+
+  font-size: 32px;
+  line-height: 1;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  cursor: pointer;
+
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.12);
+
+  transition:
+    background 0.2s ease,
+    transform 0.2s ease;
+}
+
+.gallery-arrow:hover {
+  background: #fff;
+
+  transform:
+    translateY(-50%)
+    scale(1.05);
+}
+
+.gallery-arrow-left {
+  left: 16px;
+}
+
+.gallery-arrow-right {
+  right: 16px;
+}
+
+
+
+.image-counter {
+  margin-top: 12px;
+
+  font-size: 13px;
+  color: #555;
+
+  text-align: center;
+}
+
+
+.image-dots {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  gap: 7px;
+
+  margin-top: 10px;
+}
+
+.image-dot {
+  width: 7px;
+  height: 7px;
+
+  padding: 0;
+
+  border: none;
+  border-radius: 50%;
+
+  background: #c9c0b7;
+
+  cursor: pointer;
+
+  transition:
+    transform 0.2s ease,
+    background 0.2s ease;
+}
+
+.image-dot.active {
+  background: #111;
+
+  transform: scale(1.35);
+}
+
+
+
+.info {
+  width: 100%;
+  max-width: 520px;
+}
+
+.info h1 {
+  font-size: 2.2rem;
+  margin-bottom: 10px;
+}
+
+.price {
+  font-size: 1.6rem;
+  color: #c8a96a;
+  margin-bottom: 25px;
+}
+
+.meta p {
+  margin-bottom: 8px;
+}
+
+.description {
+  margin: 25px 0;
+  line-height: 1.6;
+}
+
+
+
+.seller {
+  background-color: white;
+  padding: 20px;
+  border-radius: 14px;
+  margin-bottom: 30px;
+}
+
+.seller h3 {
+  margin-bottom: 10px;
+}
+
+
+
+.actions {
+  display: flex;
+  gap: 15px;
+  flex-wrap: wrap;
+}
+
+
+
+@media (max-width: 900px) {
+  .product-details {
+    padding: 40px 0;
+  }
+
+  .details-container {
+    grid-template-columns: 1fr;
+
+    gap: 40px;
+
+    padding: 0 25px;
+  }
+
+  .images {
+    width: 100%;
+  }
+
+  .main-image-wrapper {
+    max-width: 650px;
+    height: 520px;
+  }
+
+  .info {
+    max-width: 650px;
+    margin: 0 auto;
+  }
+}
+
+
+
+@media (max-width: 600px) {
+  .product-details {
+    padding: 30px 0;
+  }
+
+  .details-container {
+    padding: 0 16px;
+    gap: 30px;
+  }
+
+  .main-image-wrapper {
+    height: 430px;
+    border-radius: 14px;
+  }
+
+  .main-product-image {
+    border-radius: 14px;
+  }
+
+  .gallery-arrow {
+    width: 38px;
+    height: 38px;
+
+    font-size: 27px;
+  }
+
+  .gallery-arrow-left {
+    left: 10px;
+  }
+
+  .gallery-arrow-right {
+    right: 10px;
+  }
+
+  .info h1 {
+    font-size: 1.8rem;
+  }
+
+  .actions {
+    flex-direction: column;
+  }
+}
+
+
+
+.product-notice {
+  position: fixed;
+
+  top: 75px;
+  left: 50%;
+
+  transform: translateX(-50%);
+
+  z-index: 9999;
+
+  min-width: 320px;
+  max-width: 520px;
+
+  padding: 12px 26px;
+
+  background: rgba(28, 24, 21, 0.94);
+
+  color: #f7efe6;
+
+  border:
+    1px solid
+    rgba(212, 180, 120, 0.35);
+
+  border-radius: 999px;
+
+  font-size: 14px;
+  font-weight: 500;
+
+  letter-spacing: 0.2px;
+
+  text-align: center;
+
+  box-shadow:
+    0 18px 40px
+    rgba(0, 0, 0, 0.22);
+
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+
+  animation: fadeSlide 0.4s ease;
+}
+
+
+@keyframes fadeSlide {
+  from {
+    opacity: 0;
+
+    transform:
+      translate(-50%, -10px);
+  }
+
+  to {
+    opacity: 1;
+
+    transform:
+      translate(-50%, 0);
+  }
+}

@@ -1,0 +1,60 @@
+.dress-card {
+  background-color: white;
+  padding: 20px;
+  border-radius: 18px;
+}
+
+/* IMAGE */
+.image-placeholder {
+  height: 220px;
+  background-color: #e0e0e0;
+  border-radius: 14px;
+  margin-bottom: 18px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #777;
+}
+
+/* CONTENT */
+.card-content h3 {
+  font-size: 1rem;
+  margin-bottom: 6px;
+}
+
+.size {
+  font-size: 0.85rem;
+  color: #6f6f6f;
+  margin-bottom: 14px;
+}
+
+/* FOOTER */
+.card-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+/* PRICE */
+.price {
+  font-size: 1rem;
+  font-weight: 500;
+  color: #1f1f1f;
+}
+
+/* VIEW BUTTON */
+.view-btn {
+  text-decoration: none;
+  font-size: 0.8rem;
+  padding: 6px 14px;
+  border-radius: 20px;
+  border: 1px solid #1f1f1f;
+  color: #1f1f1f;
+  transition: all 0.25s ease;
+}
+
+.view-btn:hover {
+  background-color: #1f1f1f;
+  color: white;
+}

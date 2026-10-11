@@ -1,0 +1,23 @@
+.static-page {
+  background: #f4ede4;
+  min-height: calc(100vh - 140px);
+  padding: 80px 20px;
+}
+
+.static-container {
+  max-width: 800px;
+  margin: 0 auto;
+}
+
+.static-container h1 {
+  font-size: 2.5rem;
+  margin-bottom: 20px;
+  color: #111;
+}
+
+.static-container p {
+  font-size: 1rem;
+  line-height: 1.7;
+  color: #333;
+  margin-bottom: 16px;
+}
