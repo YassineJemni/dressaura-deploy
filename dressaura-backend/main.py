@@ -5,6 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from app.database import engine, Base
 from app.routers import dresses, auth
+from app.chat_api import router as chat_router
 
 app = FastAPI(title="Dressaura API")
 
@@ -30,6 +31,7 @@ Base.metadata.create_all(bind=engine)
 
 app.include_router(dresses.router)
 app.include_router(auth.router)
+app.include_router(chat_router)
 
 
 @app.get("/")
