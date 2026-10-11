@@ -2,6 +2,7 @@ import "./Sell.css";
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
+import { API_URL, apiFetch } from "../api/client";
 
 function Sell() {
   const navigate = useNavigate();
@@ -188,11 +189,6 @@ function Sell() {
     const formData = new FormData();
 
     formData.append(
-      "user_id",
-      String(user.id)
-    );
-
-    formData.append(
       "brand",
       brand
     );
@@ -226,15 +222,9 @@ function Sell() {
       );
     });
 
-    console.log(
-      "📦 Sending dress with",
-      imageFiles.length,
-      "images..."
-    );
-
     try {
-      const res = await fetch(
-        "https://dressaura-deploy.onrender.com/dresses/",
+      const res = await apiFetch(
+        `${API_URL}/dresses/`,
         {
           method: "POST",
           body: formData,
@@ -252,13 +242,6 @@ function Sell() {
             `HTTP ${res.status}`
         );
       }
-
-      const data = await res.json();
-
-      console.log(
-        "✅ Created dress:",
-        data
-      );
 
       // Clean preview URLs
       imagePreviews.forEach((preview) => {

@@ -1,19 +1,56 @@
 
-import React, { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef } from "react";
+import type { KeyboardEvent } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import "./ChatPage.css";
+import { API_URL, WS_URL, apiFetch } from "../api/client";
 
-const API_URL = "https://dressaura-deploy.onrender.com";
-const WS_URL = "wss://dressaura-deploy.onrender.com";
+type ChatProduct = {
+  id: number;
+  user_id?: number;
+  brand: string;
+  price: number;
+  size: string;
+  image_url?: string;
+  is_sold?: boolean;
+};
+
+type ChatConversation = {
+  conversation_id: number;
+  other_user_id: number;
+  other_user_name: string;
+  last_message: string | null;
+  last_message_time?: string | null;
+  product?: ChatProduct | null;
+};
+
+type ChatMessage = {
+  id: number;
+  sender_id: number;
+  message: string;
+  created_at: string | null;
+};
+
+type ChatOffer = {
+  id: number;
+  buyer_id: number;
+  seller_id: number;
+  amount: number;
+  status: string;
+};
+
+type ChatUser = { id: number; name: string };
 
 export default function ChatPage() {
-  const [conversations, setConversations] = useState([]);
-  const [activeConversation, setActiveConversation] = useState(null);
-  const [messages, setMessages] = useState([]);
+  const [conversations, setConversations] = useState<ChatConversation[]>([]);
+  const [activeConversation, setActiveConversation] =
+    useState<ChatConversation | null>(null);
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [newMessage, setNewMessage] = useState("");
-  const [chatProduct, setChatProduct] = useState(null);
+  const [chatProduct, setChatProduct] = useState<ChatProduct | null>(null);
   const [notice, setNotice] = useState("");
+  const [socketConnected, setSocketConnected] = useState(false);
 
   const showNotice = (message: string) => {
     setNotice(message);
@@ -23,19 +60,25 @@ export default function ChatPage() {
     }, 3000);
   };
 
-  const [offers, setOffers] = useState([]);
+  const [offers, setOffers] = useState<ChatOffer[]>([]);
   const [offerAmount, setOfferAmount] = useState("");
 
-  const socketRef = useRef(null);
-  const messagesEndRef = useRef(null);
-  const messagesAreaRef = useRef(null);
+  const socketRef = useRef<WebSocket | null>(null);
+  const activeConversationRef = useRef<ChatConversation | null>(null);
+  const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const messagesEndRef = useRef<HTMLDivElement | null>(null);
+  const messagesAreaRef = useRef<HTMLDivElement | null>(null);
 
-  const { user } = useAuth();
+  const { user, token } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
   const CURRENT_USER_ID = user?.id;
 
-  const sortConversations = (items) => {
+  useEffect(() => {
+    activeConversationRef.current = activeConversation;
+  }, [activeConversation]);
+
+  const sortConversations = (items: ChatConversation[]) => {
     return [...items]
       .filter((c) => c.last_message)
       .sort((a, b) => {
@@ -52,10 +95,17 @@ export default function ChatPage() {
   useEffect(() => {
     if (!CURRENT_USER_ID) return;
 
-    fetch(`${API_URL}/chat/user-conversations/${CURRENT_USER_ID}`)
-      .then((r) => r.json())
-      .then((data) => setConversations(sortConversations(data)))
-      .catch(console.error);
+    apiFetch(`${API_URL}/chat/user-conversations/${CURRENT_USER_ID}`)
+      .then(async (response) => {
+        if (!response.ok) throw new Error(`Could not load conversations (HTTP ${response.status})`);
+        const data = await response.json();
+        if (!Array.isArray(data)) throw new Error("Invalid conversations response");
+        setConversations(sortConversations(data));
+      })
+      .catch((error) => {
+        console.error("Could not load conversations:", error);
+        showNotice("Could not load your conversations.");
+      });
   }, [CURRENT_USER_ID]);
 
   useEffect(() => {
@@ -63,9 +113,10 @@ export default function ChatPage() {
 
     if (!conversationId) return;
 
+    const currentConversation = activeConversationRef.current;
     if (
-      activeConversation &&
-      Number(activeConversation.conversation_id) === Number(conversationId)
+      currentConversation &&
+      Number(currentConversation.conversation_id) === Number(conversationId)
     ) {
       if (location.state?.product) {
         setChatProduct(location.state.product);
@@ -95,83 +146,149 @@ export default function ChatPage() {
   }, [location.state, conversations]);
 
   useEffect(() => {
-    if (!CURRENT_USER_ID) return;
+    if (!CURRENT_USER_ID || !token) return;
 
-    const timeout = setTimeout(() => {
-      if (socketRef.current) {
-        socketRef.current.close();
-        socketRef.current = null;
-      }
+    let shouldReconnect = true;
+    let retryCount = 0;
+    let currentSocket: WebSocket | null = null;
+
+    const connect = () => {
+      if (!shouldReconnect) return;
 
       const ws = new WebSocket(`${WS_URL}/chat/ws/${CURRENT_USER_ID}`);
+      currentSocket = ws;
       socketRef.current = ws;
 
-      ws.onopen = () => console.log("WS connected");
+      ws.onopen = () => {
+        ws.send(JSON.stringify({ type: "auth", token }));
+      };
 
       ws.onmessage = (event) => {
         try {
           const data = JSON.parse(event.data);
-          const now = new Date().toISOString();
+          if (data.type === "ready") {
+            retryCount = 0;
+            setSocketConnected(true);
+            const activeConversationId =
+              activeConversationRef.current?.conversation_id;
+            if (activeConversationId) {
+              apiFetch(
+                `${API_URL}/chat/conversation/${activeConversationId}/messages`
+              )
+                .then(async (response) => {
+                  if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                  const missedMessages: ChatMessage[] = await response.json();
+                  setMessages((previous) => {
+                    const messagesById = new Map(
+                      [...previous, ...missedMessages].map((message) => [
+                        message.id,
+                        message,
+                      ])
+                    );
+                    return [...messagesById.values()].sort(
+                      (left, right) =>
+                        new Date(left.created_at || 0).getTime() -
+                        new Date(right.created_at || 0).getTime()
+                    );
+                  });
+                })
+                .catch((error) => {
+                  console.error("Unable to sync messages after reconnect:", error);
+                  showNotice("Could not sync missed messages.");
+                });
+            }
+            return;
+          }
+          if (data.type === "error") {
+            showNotice(data.detail || "Message could not be sent.");
+            return;
+          }
+          if (data.type !== "message") return;
 
-          setConversations((prev) => {
-            const existing = prev.find(
-              (c) => Number(c.conversation_id) === Number(data.conversation_id)
+          const receivedAt = data.created_at || new Date().toISOString();
+          const otherUserId =
+            Number(data.sender_id) === Number(CURRENT_USER_ID)
+              ? Number(data.receiver_id)
+              : Number(data.sender_id);
+
+          setConversations((previous) => {
+            const existing = previous.find(
+              (conversation) =>
+                Number(conversation.conversation_id) === Number(data.conversation_id)
             );
-
             const updatedConversation = {
-              ...(existing || data),
+              ...(existing || {}),
               conversation_id: data.conversation_id,
-              other_user_id: data.sender_id,
-              other_user_name:
-                existing?.other_user_name || data.other_user_name || "Seller",
+              other_user_id: otherUserId,
+              other_user_name: existing?.other_user_name || "Seller",
               last_message: data.message,
-              last_message_time: now,
+              last_message_time: receivedAt,
             };
-
             return sortConversations([
               updatedConversation,
-              ...prev.filter(
-                (c) =>
-                  Number(c.conversation_id) !== Number(data.conversation_id)
+              ...previous.filter(
+                (conversation) =>
+                  Number(conversation.conversation_id) !== Number(data.conversation_id)
               ),
             ]);
           });
 
-          setMessages((prev) => {
-            if (
-              Number(activeConversation?.conversation_id) ===
-              Number(data.conversation_id)
-            ) {
-              return [
-                ...prev,
-                {
-                  id: data.message_id,
-                  sender_id: data.sender_id,
-                  message: data.message,
-                  created_at: now,
-                },
-              ];
-            }
-
-            return prev;
-          });
-        } catch (e) {
-          console.error(e);
+          if (
+            Number(activeConversationRef.current?.conversation_id) ===
+            Number(data.conversation_id)
+          ) {
+            setMessages((previous) =>
+              previous.some((message) => Number(message.id) === Number(data.message_id))
+                ? previous
+                : [
+                    ...previous,
+                    {
+                      id: data.message_id,
+                      sender_id: data.sender_id,
+                      message: data.message,
+                      created_at: receivedAt,
+                    },
+                  ]
+            );
+            setActiveConversation((previous) =>
+              previous &&
+              Number(previous.conversation_id) === Number(data.conversation_id)
+                ? { ...previous, last_message: data.message, last_message_time: receivedAt }
+                : previous
+            );
+          }
+        } catch (error) {
+          console.error("Invalid chat message received:", error);
+          showNotice("A chat message could not be read.");
         }
       };
 
-      ws.onerror = console.error;
-      ws.onclose = () => console.log("WS closed");
-    }, 50);
+      ws.onerror = () => {
+        showNotice("Chat connection error. Reconnecting…");
+      };
 
-    return () => {
-      clearTimeout(timeout);
-      if (socketRef.current) {
-        socketRef.current.close();
-        socketRef.current = null;
-      }
+      ws.onclose = (event) => {
+        setSocketConnected(false);
+        if (socketRef.current === ws) socketRef.current = null;
+        if (!shouldReconnect || event.code === 1008 || event.code === 1002) {
+          if (event.code === 1008) showNotice("Your chat session expired. Please log in again.");
+          return;
+        }
+        const delay = Math.min(1000 * 2 ** retryCount, 30000);
+        retryCount += 1;
+        reconnectTimerRef.current = setTimeout(connect, delay);
+      };
     };
-  }, [CURRENT_USER_ID, activeConversation]);
+
+    connect();
+    return () => {
+      shouldReconnect = false;
+      if (reconnectTimerRef.current) clearTimeout(reconnectTimerRef.current);
+      if (currentSocket && currentSocket.readyState < WebSocket.CLOSING) currentSocket.close();
+      socketRef.current = null;
+      setSocketConnected(false);
+    };
+  }, [CURRENT_USER_ID, token]);
 
   useEffect(() => {
     if (!CURRENT_USER_ID || !activeConversation?.other_user_id) return;
@@ -183,18 +300,21 @@ export default function ChatPage() {
 
     if (!nameIsMissing) return;
 
-    fetch(`${API_URL}/chat/users/${CURRENT_USER_ID}`)
+    apiFetch(`${API_URL}/chat/users/${CURRENT_USER_ID}`)
       .then((res) => res.json())
       .then((users) => {
-        const otherUser = users.find(
+        const otherUser = (users as ChatUser[]).find(
           (u) => Number(u.id) === Number(activeConversation.other_user_id)
         );
 
         if (otherUser) {
-          setActiveConversation((prev) => ({
-            ...prev,
-            other_user_name: otherUser.name,
-          }));
+          setActiveConversation((prev) =>
+            prev &&
+            Number(prev.conversation_id) ===
+              Number(activeConversation.conversation_id)
+              ? { ...prev, other_user_name: otherUser.name }
+              : prev
+          );
 
           setConversations((prev) =>
             prev.map((conv) =>
@@ -215,33 +335,51 @@ export default function ChatPage() {
   ]);
 
   useEffect(() => {
-    if (!activeConversation) return;
+    const conversationId = activeConversation?.conversation_id;
+    if (!conversationId) return;
 
-    fetch(
-      `${API_URL}/chat/conversation/${activeConversation.conversation_id}/messages`
+    apiFetch(
+      `${API_URL}/chat/conversation/${conversationId}/messages`
     )
-      .then((r) => r.json())
-      .then(setMessages)
-      .catch(console.error);
+      .then(async (response) => {
+        if (!response.ok) throw new Error(`Could not load messages (HTTP ${response.status})`);
+        const data = await response.json();
+        if (!Array.isArray(data)) throw new Error("Invalid messages response");
+        setMessages(data);
+      })
+      .catch((error) => {
+        console.error("Could not load messages:", error);
+        showNotice("Could not load messages for this conversation.");
+      });
 
-    fetch(
-      `${API_URL}/chat/conversation/${activeConversation.conversation_id}/offers`
+    apiFetch(
+      `${API_URL}/chat/conversation/${conversationId}/offers`
     )
-      .then((r) => r.json())
-      .then(setOffers)
-      .catch(console.error);
+      .then(async (response) => {
+        if (!response.ok) throw new Error(`Could not load offers (HTTP ${response.status})`);
+        setOffers(await response.json());
+      })
+      .catch((error) => {
+        console.error("Could not load offers:", error);
+        showNotice("Could not load offers for this conversation.");
+      });
   }, [activeConversation?.conversation_id]);
 
   useEffect(() => {
-    if (!activeConversation?.conversation_id) return;
+    const conversationId = activeConversation?.conversation_id;
+    if (!conversationId) return;
 
     const interval = setInterval(() => {
-      fetch(
-        `${API_URL}/chat/conversation/${activeConversation.conversation_id}/offers`
+      apiFetch(
+        `${API_URL}/chat/conversation/${conversationId}/offers`
       )
-        .then((r) => r.json())
-        .then(setOffers)
-        .catch(console.error);
+        .then(async (response) => {
+          if (!response.ok) throw new Error(`Could not refresh offers (HTTP ${response.status})`);
+          const data: unknown = await response.json();
+          if (!Array.isArray(data)) throw new Error("Invalid offers response");
+          setOffers(data);
+        })
+        .catch((error) => console.error("Could not refresh offers:", error));
     }, 3000);
 
     return () => clearInterval(interval);
@@ -259,53 +397,25 @@ export default function ChatPage() {
   const sendMessage = () => {
     const socket = socketRef.current;
 
-    if (!newMessage.trim() || !socket || !activeConversation) return;
-    if (socket.readyState !== WebSocket.OPEN) return;
+    if (!newMessage.trim() || !activeConversation) return;
+    if (!socket || socket.readyState !== WebSocket.OPEN) {
+      showNotice("Chat is reconnecting. Please try again in a moment.");
+      return;
+    }
 
-    const now = new Date().toISOString();
-
-    socket.send(
-      JSON.stringify({
-        conversation_id: activeConversation.conversation_id,
-        receiver_id: activeConversation.other_user_id,
-        message: newMessage,
-      })
-    );
-
-    setMessages((prev) => [
-      ...prev,
-      {
-        id: Date.now(),
-        sender_id: CURRENT_USER_ID,
-        message: newMessage,
-        created_at: now,
-      },
-    ]);
-
-    setConversations((prev) => {
-      const updatedConversation = {
-        ...activeConversation,
-        last_message: newMessage,
-        last_message_time: now,
-      };
-
-      return sortConversations([
-        updatedConversation,
-        ...prev.filter(
-          (c) =>
-            Number(c.conversation_id) !==
-            Number(activeConversation.conversation_id)
-        ),
-      ]);
-    });
-
-    setActiveConversation((prev) => ({
-      ...prev,
-      last_message: newMessage,
-      last_message_time: now,
-    }));
-
-    setNewMessage("");
+    try {
+      socket.send(
+        JSON.stringify({
+          conversation_id: activeConversation.conversation_id,
+          receiver_id: activeConversation.other_user_id,
+          message: newMessage,
+        })
+      );
+      setNewMessage("");
+    } catch (error) {
+      console.error("Unable to send chat message:", error);
+      showNotice("Message was not sent. Please try again.");
+    }
   };
 
   const makeOffer = async () => {
@@ -325,16 +435,13 @@ export default function ChatPage() {
         amount: offerAmount,
       });
 
-      const res = await fetch(`${API_URL}/chat/offers?${params.toString()}`, {
+      const res = await apiFetch(`${API_URL}/chat/offers?${params.toString()}`, {
         method: "POST",
       });
 
       const data = await res.json();
 
-      if (data.error) {
-        showNotice(data.error);
-        return;
-      }
+      if (!res.ok) throw new Error(data.detail || "Could not send offer.");
 
       setOffers((prev) => [...prev, data]);
       setOfferAmount("");
@@ -344,9 +451,12 @@ export default function ChatPage() {
     }
   };
 
-  const updateOfferStatus = async (offerId, action) => {
+  const updateOfferStatus = async (
+    offerId: number,
+    action: "accept" | "decline"
+  ) => {
     try {
-      const res = await fetch(
+      const res = await apiFetch(
         `${API_URL}/chat/offers/${offerId}/${action}`,
         {
           method: "PUT",
@@ -355,10 +465,7 @@ export default function ChatPage() {
 
       const data = await res.json();
 
-      if (data.error) {
-        showNotice(data.error);
-        return;
-      }
+      if (!res.ok) throw new Error(data.detail || "Could not update offer.");
 
       setOffers((prev) =>
         prev.map((offer) =>
@@ -367,17 +474,17 @@ export default function ChatPage() {
       );
     } catch (error) {
       console.error(error);
-      showNotice("Could not update offer.");
+      showNotice(error instanceof Error ? error.message : "Could not update offer.");
     }
   };
 
-  const handleKeyDown = (e) => {
+  const handleKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Enter") sendMessage();
   };
 
-  const getInitial = (name) => (name || "?").charAt(0).toUpperCase();
+  const getInitial = (name?: string) => (name || "?").charAt(0).toUpperCase();
 
-  const formatTime = (ts) => {
+  const formatTime = (ts?: string | null) => {
     if (!ts) return "";
     return new Date(ts).toLocaleTimeString([], {
       hour: "2-digit",
@@ -461,14 +568,8 @@ export default function ChatPage() {
                 {activeConversation.other_user_name ||
                   `User ${activeConversation.other_user_id}`}
               </div>
-              <div
-                style={{
-                  fontSize: 11,
-                  color: "#4caf7d",
-                  marginTop: 1,
-                }}
-              >
-                ● Online
+              <div style={{ fontSize: 11, color: socketConnected ? "#4caf7d" : "#b0783c", marginTop: 1 }}>
+                {socketConnected ? "Connected" : "Reconnecting…"}
               </div>
             </div>
 

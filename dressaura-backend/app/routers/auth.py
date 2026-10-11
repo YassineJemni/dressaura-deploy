@@ -4,6 +4,7 @@ from datetime import timedelta
 from app import models, schemas, auth
 from app.database import SessionLocal
 from app.auth import get_db, get_password_hash, get_current_user
+from app.models import User
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
 
@@ -16,10 +17,6 @@ def get_db():
 
 @router.post("/register", response_model=schemas.Token)
 def register(user: schemas.UserCreate, db: Session = Depends(get_db)):
-
-    print("RAW PASSWORD:", user.password)
-    print("PASSWORD LENGTH:", len(user.password))
-    print("PASSWORD TYPE:", type(user.password))
     db_user = db.query(models.User).filter(models.User.email == user.email).first()
     if db_user:
         raise HTTPException(
@@ -40,7 +37,7 @@ def register(user: schemas.UserCreate, db: Session = Depends(get_db)):
 
     access_token_expires = timedelta(minutes=auth.ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token = auth.create_access_token(
-        data={"sub": new_user.email}, expires_delta=access_token_expires
+        data={"sub": str(new_user.id)}, expires_delta=access_token_expires
     )
 
     return {
@@ -61,7 +58,7 @@ def login(user_data: schemas.UserLogin, db: Session = Depends(get_db)):
 
     access_token_expires = timedelta(minutes=auth.ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token = auth.create_access_token(
-        data={"sub": user.email}, expires_delta=access_token_expires
+        data={"sub": str(user.id)}, expires_delta=access_token_expires
     )
 
     return {
@@ -79,7 +76,11 @@ def update_profile(
     user_id: int,
     profile: schemas.ProfileUpdate,
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
+    if current_user.id != user_id:
+        raise HTTPException(status_code=403, detail="You can only update your own profile")
+
     user = db.query(models.User).filter(models.User.id == user_id).first()
 
     if not user:

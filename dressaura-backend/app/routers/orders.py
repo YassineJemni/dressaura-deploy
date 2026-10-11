@@ -1,7 +1,8 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
+from app.auth import get_current_user
 from app.database import get_db
-from app.models import Order, Dress
+from app.models import Order, Dress, User
 import random
 
 router = APIRouter(prefix="/orders", tags=["orders"])
@@ -50,7 +51,8 @@ def create_order(
     payment_method: str,
     delivery_company: str,
     order_price: float,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """
     Creates a new order and initializes the simulated
@@ -65,22 +67,30 @@ def create_order(
     )
 
     if not dress:
-        return {"error": "Dress not found"}
+        raise HTTPException(status_code=404, detail="Dress not found")
+
+    if user_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Cannot place an order for another user")
+
+    if dress.user_id == current_user.id:
+        raise HTTPException(status_code=400, detail="You cannot buy your own listing")
 
     # Prevent purchasing an already sold dress
     if dress.is_sold:
-        return {"error": "Dress already sold"}
+        raise HTTPException(status_code=409, detail="Dress already sold")
 
     # Validate delivery company
     if delivery_company not in ALLOWED_DELIVERY_COMPANIES:
-        return {
-            "error": "Invalid delivery company. "
-                     "Choose DPD, GLS, or Packeta."
-        }
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid delivery company. Choose DPD, GLS, or Packeta.",
+        )
 
     # Validate order price
     if order_price <= 0:
-        return {"error": "Invalid order price"}
+        raise HTTPException(status_code=400, detail="Invalid order price")
+    if dress.price <= 0:
+        raise HTTPException(status_code=400, detail="Listing price must be greater than zero")
 
     # Generate simulated tracking information
     tracking_number = generate_tracking_number()
@@ -93,7 +103,7 @@ def create_order(
     order = Order(
         user_id=user_id,
         dress_id=dress_id,
-        order_price=order_price,
+        order_price=float(dress.price),
         payment_method=payment_method,
         status="in-progress",
         delivery_company=delivery_company,
@@ -103,13 +113,9 @@ def create_order(
     )
 
     db.add(order)
+    dress.is_sold = True
     db.commit()
     db.refresh(order)
-
-    # Mark the dress as sold
-    dress.is_sold = True
-
-    db.commit()
 
     return {
         "message": "Order created successfully",
@@ -128,12 +134,16 @@ def create_order(
 @router.get("/stats/{user_id}")
 def get_order_stats(
     user_id: int,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """
     Returns the number of orders bought and sold
     by the specified user.
     """
+
+    if user_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Cannot view another user's order statistics")
 
     ordered_count = (
         db.query(Order)
@@ -163,7 +173,8 @@ def get_orders(
     user_id: int,
     order_type: str,
     status: str,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """
     Returns orders for a user.
@@ -176,6 +187,9 @@ def get_orders(
         in-progress
         completed
     """
+
+    if user_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Cannot view another user's orders")
 
     if order_type == "ordered":
 
@@ -206,9 +220,7 @@ def get_orders(
         )
 
     else:
-        return {
-            "error": "Invalid order type"
-        }
+        raise HTTPException(status_code=400, detail="Invalid order type")
 
     result = []
 
@@ -272,7 +284,8 @@ def update_delivery_status(
     order_id: int,
     status: str,
     user_id: int,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """
     Updates the simulated delivery status.
@@ -282,14 +295,14 @@ def update_delivery_status(
     """
 
     # Validate delivery status
+    if user_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Invalid user")
+
     if status not in DELIVERY_STATUSES:
-        return {
-            "error": (
-                "Invalid delivery status. "
-                "Allowed statuses: "
-                + ", ".join(DELIVERY_STATUSES)
-            )
-        }
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid delivery status. Allowed statuses: " + ", ".join(DELIVERY_STATUSES),
+        )
 
     # Find order
     order = (
@@ -299,9 +312,7 @@ def update_delivery_status(
     )
 
     if not order:
-        return {
-            "error": "Order not found"
-        }
+        raise HTTPException(status_code=404, detail="Order not found")
 
     # Find dress
     dress = (
@@ -311,18 +322,11 @@ def update_delivery_status(
     )
 
     if not dress:
-        return {
-            "error": "Dress not found"
-        }
+        raise HTTPException(status_code=404, detail="Dress not found")
 
     # Check that the requesting user is the seller
     if dress.user_id != user_id:
-        return {
-            "error": (
-                "Only the seller can update "
-                "the delivery status."
-            )
-        }
+        raise HTTPException(status_code=403, detail="Only the seller can update the delivery status")
 
     # Update delivery status
     order.delivery_status = status
@@ -343,7 +347,8 @@ def update_delivery_status(
 @router.put("/{order_id}/complete")
 def complete_order(
     order_id: int,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """
     Marks an order as completed.
@@ -356,9 +361,15 @@ def complete_order(
     )
 
     if not order:
-        return {
-            "error": "Order not found"
-        }
+        raise HTTPException(status_code=404, detail="Order not found")
+
+    dress = db.query(Dress).filter(Dress.id == order.dress_id).first()
+    if not dress:
+        raise HTTPException(status_code=404, detail="Dress not found")
+    if current_user.id not in (order.user_id, dress.user_id):
+        raise HTTPException(status_code=403, detail="Only the buyer or seller can complete this order")
+    if order.status == "completed":
+        raise HTTPException(status_code=409, detail="Order is already completed")
 
     order.status = "completed"
 

@@ -2,6 +2,7 @@ import "./Checkout.css";
 import { useLocation, Link, useNavigate } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { useAuth } from "../context/AuthContext";
+import { API_URL, apiFetch } from "../api/client";
 
 function Checkout() {
   const location = useLocation();
@@ -65,8 +66,8 @@ function Checkout() {
       });
 
       
-      const res = await fetch(
-        `https://dressaura-deploy.onrender.com/orders/?${params.toString()}`,
+      const res = await apiFetch(
+        `${API_URL}/orders/?${params.toString()}`,
         {
          method: "POST",
         }
@@ -430,7 +431,7 @@ function Checkout() {
                       src={
                         productImage.startsWith("http")
                           ? productImage
-                          : `http://127.0.0.1:8000${productImage}`
+                          : `${API_URL}${productImage.startsWith("/") ? "" : "/"}${productImage}`
                       }
                       alt={product.brand || "Dress"}
                     />

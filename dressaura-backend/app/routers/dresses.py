@@ -11,8 +11,11 @@ from sqlalchemy.orm import Session
 from typing import Optional, List
 import os
 import shutil
+import logging
 from datetime import datetime
+from pathlib import Path
 
+from app.auth import get_current_user
 from app.deps import get_db
 from app import models, schemas
 
@@ -25,7 +28,8 @@ router = APIRouter(
 
 
 
-UPLOAD_DIR = "app/uploads/dresses"
+UPLOAD_DIR = Path(__file__).resolve().parents[1] / "uploads" / "dresses"
+logger = logging.getLogger(__name__)
 
 os.makedirs(
     UPLOAD_DIR,
@@ -121,7 +125,6 @@ def get_dress(
     response_model=schemas.DressOut
 )
 async def create_dress(
-    user_id: int = Form(...),
     brand: str = Form(...),
     size: str = Form(...),
     condition_status: str = Form(...),
@@ -130,13 +133,19 @@ async def create_dress(
 
     images: Optional[List[UploadFile]] = File(None),
 
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
 ):
-
-
+    if images and len(images) > 10:
+        raise HTTPException(
+            status_code=400,
+            detail="A maximum of 10 images is allowed.",
+        )
+    if price <= 0:
+        raise HTTPException(status_code=400, detail="Price must be greater than zero")
 
     new_dress = models.Dress(
-        user_id=user_id,
+        user_id=current_user.id,
         brand=brand,
         size=size,
         condition_status=condition_status,
@@ -157,12 +166,6 @@ async def create_dress(
     uploaded_images = []
 
     if images:
-
-        if len(images) > 10:
-            raise HTTPException(
-                status_code=400,
-                detail="A maximum of 10 images is allowed."
-            )
 
         for index, image in enumerate(images):
 
@@ -237,7 +240,8 @@ async def create_dress(
 def update_dress(
     dress_id: int,
     dress_update: schemas.DressCreate,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
 ):
 
     dress = (
@@ -253,6 +257,11 @@ def update_dress(
             status_code=404,
             detail="Dress not found"
         )
+
+    if dress.user_id != current_user.id:
+        raise HTTPException(status_code=403, detail="You can only edit your own listing")
+    if dress_update.price <= 0:
+        raise HTTPException(status_code=400, detail="Price must be greater than zero")
 
     dress.brand = dress_update.brand
 
@@ -287,7 +296,8 @@ async def add_dress_images(
         None
     ),
 
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
 ):
 
     dress = (
@@ -304,6 +314,8 @@ async def add_dress_images(
             detail="Dress not found"
         )
 
+    if dress.user_id != current_user.id:
+        raise HTTPException(status_code=403, detail="You can only edit your own listing")
 
     if not images:
         raise HTTPException(
@@ -433,7 +445,8 @@ async def add_dress_images(
 )
 def delete_dress_image(
     image_id: int,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
 ):
 
     image = (
@@ -449,6 +462,12 @@ def delete_dress_image(
             status_code=404,
             detail="Image not found"
         )
+
+    dress = db.query(models.Dress).filter(models.Dress.id == image.dress_id).first()
+    if not dress:
+        raise HTTPException(status_code=404, detail="Listing not found")
+    if dress.user_id != current_user.id:
+        raise HTTPException(status_code=403, detail="You can only edit your own listing")
 
 
     dress_id = image.dress_id
@@ -481,7 +500,7 @@ def delete_dress_image(
             try:
                 os.remove(file_path)
             except OSError:
-                pass
+                logger.exception("Unable to remove uploaded dress image")
 
 
 
@@ -545,7 +564,8 @@ def reorder_dress_images(
 
     reorder_data: schemas.ImageReorderRequest,
 
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
 ):
 
     image_ids = reorder_data.image_ids
@@ -567,6 +587,9 @@ def reorder_dress_images(
             status_code=404,
             detail="Dress not found"
         )
+
+    if dress.user_id != current_user.id:
+        raise HTTPException(status_code=403, detail="You can only edit your own listing")
 
 
 
@@ -650,7 +673,8 @@ def reorder_dress_images(
 )
 def delete_dress(
     dress_id: int,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
 ):
 
     dress = (
@@ -668,6 +692,8 @@ def delete_dress(
             detail="Dress not found"
         )
 
+    if dress.user_id != current_user.id:
+        raise HTTPException(status_code=403, detail="You can only delete your own listing")
 
 
 

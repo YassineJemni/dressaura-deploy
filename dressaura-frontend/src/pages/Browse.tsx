@@ -1,6 +1,7 @@
 import "./Browse.css";
 import DressCard from "../components/DressCard";
 import { useEffect, useState } from "react";
+import { API_URL, apiFetch } from "../api/client";
 
 function Browse() {
   const [dresses, setDresses] = useState<any[]>([]);
@@ -14,14 +15,12 @@ function Browse() {
   const [maxPrice, setMaxPrice] = useState("");
 
   useEffect(() => {
-    fetch("https://dressaura-deploy.onrender.com/dresses/")
+    apiFetch(`${API_URL}/dresses/`)
       .then((res) => {
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         return res.json();
       })
       .then((data) => {
-        console.log("✅ dresses from backend:", data);
-
         const normalized = data.map((dress: any) => ({
           ...dress,
           condition: dress.condition_status,

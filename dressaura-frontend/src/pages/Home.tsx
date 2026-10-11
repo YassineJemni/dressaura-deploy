@@ -1,6 +1,7 @@
 import "./Home.css";
 import DressCard from "../components/DressCard";
 import { useEffect, useState } from "react";
+import { API_URL, apiFetch } from "../api/client";
 import { useLocation, Link } from "react-router-dom";
 
 function Home() {
@@ -9,7 +10,7 @@ function Home() {
 
   
   useEffect(() => {
-    fetch("https://dressaura-deploy.onrender.com/dresses/")
+    apiFetch(`${API_URL}/dresses/`)
       .then((res) => res.json())
       .then((data) => setDresses(data))
       .catch((err) => console.error("Failed to load dresses:", err));

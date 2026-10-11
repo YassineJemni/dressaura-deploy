@@ -3,8 +3,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { useAuth } from "../context/AuthContext";
 import "./ProductDetails.css";
-
-const API_URL = "https://dressaura-deploy.onrender.com";
+import { API_URL, apiFetch } from "../api/client";
 
 function ProductDetails() {
   const { id } = useParams();
@@ -28,7 +27,7 @@ function ProductDetails() {
   };
 
   useEffect(() => {
-    fetch(`${API_URL}/dresses/${id}`)
+    apiFetch(`${API_URL}/dresses/${id}`)
       .then((res) => {
         if (!res.ok) {
           throw new Error("Dress not found");
@@ -37,8 +36,6 @@ function ProductDetails() {
         return res.json();
       })
       .then((data) => {
-        console.log("PRODUCT DATA:", data);
-
         setProduct({
           ...data,
           condition: data.condition_status,
@@ -168,10 +165,6 @@ function ProductDetails() {
       product.owner_id ||
       product.created_by;
 
-    console.log("CURRENT USER:", user?.id);
-    console.log("SELLER ID:", sellerId);
-    console.log("PRODUCT:", product);
-
     if (!sellerId) {
       showNotice(
         "Seller information is missing for this dress."
@@ -193,7 +186,7 @@ function ProductDetails() {
         product_id: String(product.id),
       });
 
-      const res = await fetch(
+      const res = await apiFetch(
         `${API_URL}/chat/conversation?${params.toString()}`,
         {
           method: "POST",
@@ -205,8 +198,6 @@ function ProductDetails() {
       }
 
       const convo = await res.json();
-
-      console.log("CHAT RESPONSE:", convo);
 
       const conversationId =
         convo.id || convo.conversation_id;

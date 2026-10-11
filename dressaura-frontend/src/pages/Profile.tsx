@@ -3,6 +3,7 @@ import { useAuth } from "../context/AuthContext";
 import { useNavigate } from "react-router-dom";
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
+import { API_URL, apiFetch } from "../api/client";
 
 interface Dress {
   id: number;
@@ -32,7 +33,8 @@ export default function Profile() {
 
       try {
         // Fetch listings
-        const dressesRes = await fetch("https://dressaura-deploy.onrender.com/dresses/");
+        const dressesRes = await apiFetch(`${API_URL}/dresses/`);
+        if (!dressesRes.ok) throw new Error(`Could not load listings (HTTP ${dressesRes.status})`);
         const dressesData: Dress[] = await dressesRes.json();
 
         const userListings = dressesData.filter(
@@ -40,7 +42,8 @@ export default function Profile() {
         );
 
         // Fetch sold + ordered stats
-        const ordersRes = await fetch(`https://dressaura-deploy.onrender.com/orders/stats/${user.id}`);
+        const ordersRes = await apiFetch(`${API_URL}/orders/stats/${user.id}`);
+        if (!ordersRes.ok) throw new Error(`Could not load order statistics (HTTP ${ordersRes.status})`);
         const ordersData = await ordersRes.json();
 
         setStats({

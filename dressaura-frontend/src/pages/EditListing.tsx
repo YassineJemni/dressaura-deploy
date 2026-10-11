@@ -2,8 +2,7 @@
 import "./EditListing.css";
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-
-const API_URL = "https://dressaura-deploy.onrender.com";
+import { API_URL, apiFetch } from "../api/client";
 
 type PhotoItem =
   | {
@@ -51,7 +50,7 @@ export default function EditListing() {
   useEffect(() => {
     const fetchListing = async () => {
       try {
-        const res = await fetch(`${API_URL}/dresses/${id}`);
+        const res = await apiFetch(`${API_URL}/dresses/${id}`);
 
         const data = await res.json();
 
@@ -281,7 +280,7 @@ export default function EditListing() {
 
     try {
       // 1. Save listing details.
-      const detailsResponse = await fetch(
+      const detailsResponse = await apiFetch(
         `${API_URL}/dresses/${id}`,
         {
           method: "PUT",
@@ -326,7 +325,7 @@ export default function EditListing() {
       );
 
       for (const photo of removedPhotos) {
-        const deleteResponse = await fetch(
+        const deleteResponse = await apiFetch(
           `${API_URL}/dresses/images/${photo.id}`,
           { method: "DELETE" }
         );
@@ -347,7 +346,7 @@ export default function EditListing() {
           imageFormData.append("images", photo.file);
         });
 
-        const uploadResponse = await fetch(
+        const uploadResponse = await apiFetch(
           `${API_URL}/dresses/${id}/images`,
           {
             method: "POST",
@@ -359,7 +358,7 @@ export default function EditListing() {
       }
 
       // 4. Reload saved images to obtain IDs assigned to uploaded files.
-      const listingResponse = await fetch(
+      const listingResponse = await apiFetch(
         `${API_URL}/dresses/${id}`
       );
 
@@ -396,7 +395,7 @@ export default function EditListing() {
       });
 
       // 5. Save final order; the first photo becomes the cover.
-      const reorderResponse = await fetch(
+      const reorderResponse = await apiFetch(
         `${API_URL}/dresses/${id}/images/reorder`,
         {
           method: "PUT",

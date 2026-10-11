@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import type { ReactNode } from "react";
+import { API_URL, apiFetch } from "../api/client";
 
 interface User {
   id: number;
@@ -21,22 +22,55 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
-  const [token, setToken] = useState<string | null>(null);
+  const [user, setUser] = useState<User | null>(() => {
+    const savedUser = localStorage.getItem("user");
+    if (!savedUser) return null;
+    try {
+      return JSON.parse(savedUser) as User;
+    } catch {
+      return null;
+    }
+  });
+  const [token, setToken] = useState<string | null>(() =>
+    localStorage.getItem("token")
+  );
   const navigate = useNavigate();
 
   useEffect(() => {
-    const savedToken = localStorage.getItem("token");
-    const savedUser = localStorage.getItem("user");
+    if (!token) return;
 
-    if (savedToken && savedUser) {
-      setToken(savedToken);
-      setUser(JSON.parse(savedUser));
-    }
-  }, []);
+    let cancelled = false;
+    apiFetch(`${API_URL}/auth/me`)
+      .then(async (res) => {
+        if (res.status === 401) {
+          if (!cancelled) {
+            setToken(null);
+            setUser(null);
+            localStorage.removeItem("token");
+            localStorage.removeItem("user");
+          }
+          return null;
+        }
+        if (!res.ok) throw new Error(`Account validation failed (HTTP ${res.status})`);
+        return res.json();
+      })
+      .then((currentUser) => {
+        if (currentUser && !cancelled) {
+          setUser(currentUser);
+          localStorage.setItem("user", JSON.stringify(currentUser));
+        }
+      })
+      .catch((error) => {
+        if (!cancelled) console.error("Unable to validate saved session:", error);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [token]);
 
   const login = async (email: string, password: string) => {
-    const res = await fetch("https://dressaura-deploy.onrender.com/auth/login", {
+    const res = await apiFetch(`${API_URL}/auth/login`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ email, password }),
@@ -56,7 +90,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const register = async (name: string, email: string, password: string) => {
-    const res = await fetch("https://dressaura-deploy.onrender.com/auth/register", {
+    const res = await apiFetch(`${API_URL}/auth/register`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ name, email, password }),

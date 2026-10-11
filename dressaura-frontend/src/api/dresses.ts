@@ -1,7 +1,7 @@
-const API_URL = "https://dressaura-deploy.onrender.com";
+import { API_URL, apiFetch } from "./client";
 
 export async function fetchDresses() {
-  const res = await fetch(`${API_URL}/dresses/`);
+  const res = await apiFetch(`${API_URL}/dresses/`);
   if (!res.ok) {
     throw new Error("Failed to fetch dresses");
   }

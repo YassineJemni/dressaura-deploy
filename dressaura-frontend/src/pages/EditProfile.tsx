@@ -3,8 +3,7 @@ import "./EditProfile.css";
 import { useAuth } from "../context/AuthContext";
 import { useNavigate } from "react-router-dom";
 import { useState } from "react";
-
-const API_URL = "https://dressaura-deploy.onrender.com";
+import { API_URL, apiFetch } from "../api/client";
 
 export default function EditProfile() {
   const { user, setUser } = useAuth();
@@ -33,6 +32,11 @@ export default function EditProfile() {
     setError("");
     setSuccess("");
 
+    if (!user) {
+      setError("You must be logged in to update your profile.");
+      return;
+    }
+
     if (formData.password || formData.confirmPassword) {
       if (formData.password !== formData.confirmPassword) {
         setError("Passwords do not match.");
@@ -57,8 +61,8 @@ export default function EditProfile() {
         payload.password = formData.password;
       }
 
-      const response = await fetch(
-        `${API_URL}/api/auth/users/${user.id}`,
+      const response = await apiFetch(
+        `${API_URL}/auth/users/${user.id}`,
         {
           method: "PUT",
           headers: {

@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom";
 import "./DressCard.css";
+import { API_URL } from "../api/client";
 
 type Dress = {
   id: number;
@@ -15,7 +16,7 @@ function DressCard({ dress }: { dress: Dress }) {
       {/* IMAGE */}
       {dress.image_url ? (
         <img
-          src={`https://dressaura-deploy.onrender.com${dress.image_url}`}
+          src={`${API_URL}${dress.image_url}`}
           alt={dress.brand}
           style={{
             width: "100%",

@@ -3,8 +3,7 @@ import "./OrdersPage.css";
 import { Link, useParams } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { useAuth } from "../context/AuthContext";
-
-const API_URL = "https://dressaura-deploy.onrender.com";
+import { API_URL, apiFetch } from "../api/client";
 
 function OrdersPage() {
   const { type, status } = useParams();
@@ -36,10 +35,17 @@ function OrdersPage() {
   useEffect(() => {
     if (!user?.id || !type || !status) return;
 
-    fetch(`${API_URL}/orders/${user.id}/${type}/${status}`)
-      .then((res) => res.json())
-      .then((data) => setOrders(data))
-      .catch(console.error);
+    apiFetch(`${API_URL}/orders/${user.id}/${type}/${status}`)
+      .then(async (res) => {
+        if (!res.ok) throw new Error(`Could not load orders (HTTP ${res.status})`);
+        const data = await res.json();
+        if (!Array.isArray(data)) throw new Error("Invalid orders response");
+        setOrders(data);
+      })
+      .catch((error) => {
+        console.error("Could not load orders:", error);
+        showNotice("Could not load your orders.");
+      });
   }, [user, type, status]);
 
   useEffect(() => {
@@ -48,7 +54,7 @@ function OrdersPage() {
 
   const markAsCompleted = async (orderId: number) => {
     try {
-      const res = await fetch(
+      const res = await apiFetch(
         `${API_URL}/orders/${orderId}/complete`,
         {
           method: "PUT",
@@ -57,10 +63,7 @@ function OrdersPage() {
 
       const data = await res.json();
 
-      if (data.error) {
-        showNotice(data.error);
-        return;
-      }
+      if (!res.ok) throw new Error(data.detail || "Failed to update order.");
 
       setOrders((prev) =>
         prev.filter((order) => order.id !== orderId)
@@ -69,7 +72,7 @@ function OrdersPage() {
       showNotice("Order marked as completed.");
     } catch (error) {
       console.error(error);
-      showNotice("Failed to update order.");
+      showNotice(error instanceof Error ? error.message : "Failed to update order.");
     }
   };
 
@@ -87,7 +90,7 @@ function OrdersPage() {
         user_id: String(user.id),
       });
 
-      const res = await fetch(
+      const res = await apiFetch(
         `${API_URL}/orders/${orderId}/delivery-status?${params.toString()}`,
         {
           method: "PUT",
@@ -96,10 +99,7 @@ function OrdersPage() {
 
       const data = await res.json();
 
-      if (data.error) {
-        showNotice(data.error);
-        return;
-      }
+      if (!res.ok) throw new Error(data.detail || "Failed to update delivery.");
 
       setOrders((prev) =>
         prev.map((order) =>
@@ -115,7 +115,7 @@ function OrdersPage() {
       showNotice(`Delivery updated to "${newStatus}".`);
     } catch (error) {
       console.error(error);
-      showNotice("Failed to update delivery status.");
+      showNotice(error instanceof Error ? error.message : "Failed to update delivery status.");
     } finally {
       setUpdatingDelivery(null);
     }

@@ -3,8 +3,7 @@ import "./MyListings.css";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { useEffect, useState } from "react";
-
-const API_URL = "https://dressaura-deploy.onrender.com";
+import { API_URL, apiFetch } from "../api/client";
 
 export default function MyListings() {
   const navigate = useNavigate();
@@ -23,7 +22,7 @@ export default function MyListings() {
 
   const handleDelete = async (listingId: any) => {
     try {
-      const res = await fetch(`${API_URL}/dresses/${listingId}`, {
+      const res = await apiFetch(`${API_URL}/dresses/${listingId}`, {
         method: "DELETE",
       });
 
@@ -55,7 +54,7 @@ export default function MyListings() {
   useEffect(() => {
     const fetchListings = async () => {
       try {
-        const res = await fetch(`${API_URL}/dresses`);
+        const res = await apiFetch(`${API_URL}/dresses`);
 
         if (!res.ok) {
           throw new Error("Failed to fetch listings");
