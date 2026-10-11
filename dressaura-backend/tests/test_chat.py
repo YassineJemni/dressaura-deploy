@@ -292,6 +292,48 @@ class ChatWebSocketTests(unittest.TestCase):
             self.assertEqual(float(order.order_price), 30)
             self.assertTrue(dress.is_sold)
 
+    def test_existing_user_login_and_token_validation(self):
+        existing_user = User(
+            name="Existing Account",
+            email="existing-account@example.com",
+            password="$2b$12$ToFfXSnxJklNf/uuEkhCY.OjS2pVViW6gVFY2O2tzAv3V2O2vLQNa",
+        )
+        with self.session_factory() as db:
+            db.add(existing_user)
+            db.commit()
+            db.refresh(existing_user)
+            existing_user_id = existing_user.id
+
+        response = self.client.post(
+            "/auth/login",
+            json={
+                "email": "existing-account@example.com",
+                "password": "existing-user-password-for-regression",
+            },
+        )
+        self.assertEqual(response.status_code, 200)
+        access_token = response.json()["access_token"]
+        self.assertEqual(
+            auth.jwt.decode(access_token, auth.SECRET_KEY, algorithms=[auth.ALGORITHM])["sub"],
+            str(existing_user_id),
+        )
+
+        response = self.client.get(
+            "/auth/me",
+            headers={"Authorization": f"Bearer {access_token}"},
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["id"], existing_user_id)
+        self.assertEqual(response.json()["email"], "existing-account@example.com")
+
+        legacy_token = create_access_token({"sub": "existing-account@example.com"})
+        response = self.client.get(
+            "/auth/me",
+            headers={"Authorization": f"Bearer {legacy_token}"},
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["id"], existing_user_id)
+
     def test_registration_login_and_profile_update_require_valid_session(self):
         response = self.client.post(
             "/auth/register",
