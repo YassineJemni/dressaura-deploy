@@ -234,7 +234,7 @@ function Sell() {
 
     try {
       const res = await fetch(
-        "/api/dresses/",
+        "https://dressaura-deploy.onrender.com/dresses/",
         {
           method: "POST",
           body: formData,
