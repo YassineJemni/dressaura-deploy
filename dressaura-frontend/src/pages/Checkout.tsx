@@ -64,12 +64,14 @@ function Checkout() {
         order_price: String(product.price),
       });
 
+      
       const res = await fetch(
-        `http://localhost:8000/orders/?${params.toString()}`,
+        `https://dressaura-deploy.onrender.com/orders/?${params.toString()}`,
         {
-          method: "POST",
+         method: "POST",
         }
       );
+
 
       if (!res.ok) {
         throw new Error("Failed to place order");
