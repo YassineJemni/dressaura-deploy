@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { useEffect, useState } from "react";
 import { API_URL, apiFetch } from "../api/client";
+import DressImage from "../components/DressImage";
 
 export default function MyListings() {
   const navigate = useNavigate();
@@ -13,12 +14,6 @@ export default function MyListings() {
   const [loading, setLoading] = useState(true);
   const [selectedListingId, setSelectedListingId] = useState<number | null>(null);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
-
-  const getImageUrl = (imageUrl: any) => {
-    if (!imageUrl) return "https://via.placeholder.com/120x140";
-    if (imageUrl.startsWith("http")) return imageUrl;
-    return `${API_URL}${imageUrl}`;
-  };
 
   const handleDelete = async (listingId: any) => {
     try {
@@ -114,8 +109,8 @@ export default function MyListings() {
           <div className="listings-grid">
             {listings.map((item: any) => (
               <div className="listing-card" key={item.id}>
-                <img
-                  src={getImageUrl(item.image_url)}
+                <DressImage
+                  src={item.image_url}
                   alt={item.brand}
                   className="listing-image"
                 />

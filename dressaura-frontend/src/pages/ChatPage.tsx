@@ -5,6 +5,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import "./ChatPage.css";
 import { API_URL, WS_URL, apiFetch } from "../api/client";
+import DressImage from "../components/DressImage";
 
 type ChatProduct = {
   id: number;
@@ -627,12 +628,12 @@ export default function ChatPage() {
 
           {chatProduct && (
             <div className="product-context">
-              {chatProduct.image_url && (
-                <img
-                  src={`${API_URL}${chatProduct.image_url}`}
-                  alt={chatProduct.brand}
-                />
-              )}
+              <DressImage
+                src={chatProduct.image_url}
+                alt={chatProduct.brand}
+                className="chat-product-image"
+                placeholderClassName="chat-product-image-placeholder"
+              />
 
               <div className="product-context-info">
                 <div className="product-context-label">Regarding this dress</div>

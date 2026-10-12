@@ -91,7 +91,8 @@
   padding: 16px;
 }
 
-.order-item img {
+.order-item img,
+.order-item .order-dress-image-placeholder {
   width: 82px;
   height: 82px;
   border-radius: 14px;

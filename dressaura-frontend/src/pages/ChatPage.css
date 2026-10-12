@@ -121,7 +121,8 @@
     border-radius: 14px;
   }
 
-  .product-context img {
+  .product-context img,
+  .product-context .chat-product-image-placeholder {
     width: 58px;
     height: 58px;
     object-fit: cover;

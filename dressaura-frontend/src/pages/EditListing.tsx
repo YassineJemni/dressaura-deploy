@@ -3,6 +3,7 @@ import "./EditListing.css";
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { API_URL, apiFetch } from "../api/client";
+import DressImage from "../components/DressImage";
 
 type PhotoItem =
   | {
@@ -36,16 +37,6 @@ export default function EditListing() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
-
-  const getImageUrl = (url: string) => {
-    if (!url) return "";
-
-    if (url.startsWith("http")) {
-      return url;
-    }
-
-    return `${API_URL}${url}`;
-  };
 
   useEffect(() => {
     const fetchListing = async () => {
@@ -83,7 +74,7 @@ export default function EditListing() {
             type: "existing" as const,
             id: image.id,
             image_url: image.image_url,
-            preview: getImageUrl(image.image_url),
+            preview: image.image_url,
           }));
         } else if (data.image_url) {
           // Backwards compatibility with old listings
@@ -92,7 +83,7 @@ export default function EditListing() {
               type: "existing",
               id: "legacy-image",
               image_url: data.image_url,
-              preview: getImageUrl(data.image_url),
+              preview: data.image_url,
             },
           ];
         }
@@ -467,9 +458,10 @@ export default function EditListing() {
                 onDragOver={(e) => e.preventDefault()}
                 onDrop={(e) => handleDrop(e, index)}
               >
-                <img
+                <DressImage
                   src={photo.preview}
                   alt={`Dress ${index + 1}`}
+                  className="photo-preview-image"
                 />
 
                 {index === 0 && (

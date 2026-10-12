@@ -3,6 +3,7 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { API_URL, apiFetch } from "../api/client";
+import DressImage from "../components/DressImage";
 
 function Sell() {
   const navigate = useNavigate();
@@ -367,9 +368,10 @@ function Sell() {
                   }}
                 >
 
-                  <img
+                  <DressImage
                     src={preview}
                     alt={`Preview ${index + 1}`}
+                    className="sell-photo-preview"
                     style={{
                       width: "100%",
                       height: "100%",

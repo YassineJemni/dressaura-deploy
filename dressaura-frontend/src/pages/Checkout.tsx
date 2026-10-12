@@ -3,6 +3,7 @@ import { useLocation, Link, useNavigate } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { useAuth } from "../context/AuthContext";
 import { API_URL, apiFetch } from "../api/client";
+import DressImage from "../components/DressImage";
 
 function Checkout() {
   const location = useLocation();
@@ -427,13 +428,11 @@ function Checkout() {
               <div className="summary-product">
                 <div className="summary-image">
                   {productImage ? (
-                    <img
-                      src={
-                        productImage.startsWith("http")
-                          ? productImage
-                          : `${API_URL}${productImage.startsWith("/") ? "" : "/"}${productImage}`
-                      }
+                    <DressImage
+                      src={productImage}
                       alt={product.brand || "Dress"}
+                      className="summary-dress-image"
+                      placeholderClassName="summary-image-placeholder"
                     />
                   ) : (
                     <div className="summary-image-placeholder">

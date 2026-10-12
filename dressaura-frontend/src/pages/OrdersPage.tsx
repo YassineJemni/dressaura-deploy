@@ -4,6 +4,7 @@ import { Link, useParams } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { useAuth } from "../context/AuthContext";
 import { API_URL, apiFetch } from "../api/client";
+import DressImage from "../components/DressImage";
 
 function OrdersPage() {
   const { type, status } = useParams();
@@ -166,12 +167,12 @@ function OrdersPage() {
 
                 return (
                   <div className="order-item" key={order.id}>
-                    {order.dress?.image_url && (
-                      <img
-                        src={`${API_URL}${order.dress.image_url}`}
-                        alt={order.dress.brand}
-                      />
-                    )}
+                    <DressImage
+                      src={order.dress?.image_url}
+                      alt={order.dress?.brand || "Dress"}
+                      className="order-dress-image"
+                      placeholderClassName="order-dress-image-placeholder"
+                    />
 
                     <div className="order-information">
                       <h3>{order.dress?.brand} Dress</h3>

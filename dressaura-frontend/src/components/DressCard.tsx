@@ -1,6 +1,6 @@
 import { Link } from "react-router-dom";
 import "./DressCard.css";
-import { API_URL } from "../api/client";
+import DressImage from "./DressImage";
 
 type Dress = {
   id: number;
@@ -14,21 +14,18 @@ function DressCard({ dress }: { dress: Dress }) {
   return (
     <div className="dress-card">
       {/* IMAGE */}
-      {dress.image_url ? (
-        <img
-          src={`${API_URL}${dress.image_url}`}
-          alt={dress.brand}
-          style={{
-            width: "100%",
-            height: "220px",
-            objectFit: "cover",
-            borderRadius: "14px",
-            marginBottom: "18px"
-          }}
-        />
-      ) : (
-        <div className="image-placeholder">No Image</div>
-      )}
+      <DressImage
+        src={dress.image_url}
+        alt={dress.brand}
+        className="image-placeholder"
+        style={{
+          width: "100%",
+          height: "220px",
+          objectFit: "cover",
+          borderRadius: "14px",
+          marginBottom: "18px"
+        }}
+      />
 
       <div className="card-content">
         <h3>{dress.brand}</h3>

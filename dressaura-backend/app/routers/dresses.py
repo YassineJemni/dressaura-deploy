@@ -69,14 +69,25 @@ def _upload_image(image: UploadFile) -> tuple[str, Optional[str]]:
 
 def _cloudinary_public_id(image_url: Optional[str]) -> Optional[str]:
     """Extract a Cloudinary public ID from a standard secure URL."""
-    if not image_url or "res.cloudinary.com" not in image_url:
+    if not image_url:
         return None
     try:
-        path = urlparse(image_url).path
+        parsed_url = urlparse(image_url)
+        if (
+            parsed_url.scheme != "https"
+            or parsed_url.hostname != "res.cloudinary.com"
+        ):
+            return None
+        path = parsed_url.path
         marker = "/upload/"
         if marker not in path:
             return None
         asset_path = path.split(marker, 1)[1]
+        # The app's Cloudinary folder lets us ignore delivery transformations.
+        folder_marker = "dressaura/dresses/"
+        if folder_marker in asset_path:
+            asset_path = asset_path.split(folder_marker, 1)[1]
+            asset_path = f"dressaura/dresses/{asset_path}"
         # Remove optional version segment (v123456789/).
         asset_path = re.sub(r"^v\d+/", "", asset_path)
         # Remove the file extension, preserving dots inside folder/file names as much as possible.
@@ -107,6 +118,47 @@ def _delete_stored_image(image_url: Optional[str]) -> None:
                 file_path.unlink()
         except OSError:
             logger.exception("Unable to remove local dress image %s", file_path)
+
+
+def _delete_stored_image_if_unreferenced(
+    db: Session,
+    image_url: Optional[str],
+) -> None:
+    if not image_url:
+        return
+    public_id = _cloudinary_public_id(image_url)
+    if public_id:
+        referenced_urls = [
+            row[0]
+            for row in db.query(models.DressImage.image_url)
+            .filter(models.DressImage.image_url.like("%res.cloudinary.com%"))
+            .all()
+        ]
+        referenced_urls.extend(
+            row[0]
+            for row in db.query(models.Dress.image_url)
+            .filter(models.Dress.image_url.like("%res.cloudinary.com%"))
+            .all()
+        )
+        if any(
+            _cloudinary_public_id(reference) == public_id
+            for reference in referenced_urls
+        ):
+            return
+    else:
+        image_reference = (
+            db.query(models.DressImage.id)
+            .filter(models.DressImage.image_url == image_url)
+            .first()
+        )
+        cover_reference = (
+            db.query(models.Dress.id)
+            .filter(models.Dress.image_url == image_url)
+            .first()
+        )
+        if image_reference or cover_reference:
+            return
+    _delete_stored_image(image_url)
 
 
 @router.get("/", response_model=list[schemas.DressOut])
@@ -166,11 +218,10 @@ async def create_dress(
         image_url=None,
     )
     db.add(new_dress)
-    db.commit()
-    db.refresh(new_dress)
 
     uploaded_images = []
     try:
+        db.flush()
         for index, image in enumerate(images or []):
             if not image.filename:
                 continue
@@ -189,12 +240,6 @@ async def create_dress(
         return new_dress
     except Exception:
         db.rollback()
-        # The dress row was committed before upload; remove it if upload failed.
-        try:
-            db.delete(new_dress)
-            db.commit()
-        except Exception:
-            db.rollback()
         raise
 
 
@@ -248,16 +293,20 @@ async def add_dress_images(
     if current_count + len(images) > 10:
         raise HTTPException(status_code=400, detail="A maximum of 10 images is allowed.")
 
+    uploaded_image_urls = []
     try:
         for index, image in enumerate(images):
             if not image.filename:
                 continue
             image_url, _public_id = _upload_image(image)
+            uploaded_image_urls.append(image_url)
             db.add(models.DressImage(
                 dress_id=dress_id,
                 image_url=image_url,
                 display_order=current_count + index,
             ))
+        if current_count == 0 and uploaded_image_urls:
+            dress.image_url = uploaded_image_urls[0]
         db.commit()
     except Exception:
         db.rollback()
@@ -269,9 +318,6 @@ async def add_dress_images(
         .order_by(models.DressImage.display_order)
         .all()
     )
-    if all_images:
-        dress.image_url = all_images[0].image_url
-    db.commit()
     return {"message": "Images added successfully", "count": len(all_images)}
 
 
@@ -293,8 +339,6 @@ def delete_dress_image(
     dress_id = image.dress_id
     image_url = image.image_url
     db.delete(image)
-    db.commit()
-    _delete_stored_image(image_url)
 
     remaining_images = (
         db.query(models.DressImage)
@@ -308,6 +352,7 @@ def delete_dress_image(
     if dress:
         dress.image_url = remaining_images[0].image_url if remaining_images else None
     db.commit()
+    _delete_stored_image_if_unreferenced(db, image_url)
     return {"message": "Image deleted successfully"}
 
 

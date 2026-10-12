@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useAuth } from "../context/AuthContext";
 import "./ProductDetails.css";
 import { API_URL, apiFetch } from "../api/client";
+import DressImage from "../components/DressImage";
 
 function ProductDetails() {
   const { id } = useParams();
@@ -66,12 +67,6 @@ function ProductDetails() {
 
   const currentImage =
     productImages[currentImageIndex]?.image_url || null;
-
-  const getImageUrl = (imageUrl: string) => {
-    if (!imageUrl) return "";
-    if (imageUrl.startsWith("http")) return imageUrl;
-    return `${API_URL}${imageUrl.startsWith("/") ? "" : "/"}${imageUrl}`;
-  };
 
   const nextImage = () => {
     if (productImages.length <= 1) return;
@@ -281,8 +276,8 @@ function ProductDetails() {
           >
             {currentImage ? (
               <>
-                <img
-                  src={getImageUrl(currentImage)}
+                <DressImage
+                  src={currentImage}
                   alt={`${product.brand} dress ${
                     currentImageIndex + 1
                   }`}
@@ -314,9 +309,11 @@ function ProductDetails() {
                 )}
               </>
             ) : (
-              <div className="main-image">
-                No Image
-              </div>
+              <DressImage
+                alt={`${product.brand} dress`}
+                className="main-product-image"
+                placeholderClassName="main-image"
+              />
             )}
           </div>
 
